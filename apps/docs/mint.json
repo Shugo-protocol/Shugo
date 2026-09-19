@@ -1,0 +1,45 @@
+{
+  "$schema": "https://mintlify.com/schema.json",
+  "name": "shugo / 守護",
+  "logo": {
+    "dark": "https://mintlify.s3-us-west-1.amazonaws.com/mintlify/logo-dark.svg",
+    "light": "https://mintlify.s3-us-west-1.amazonaws.com/mintlify/logo-light.svg"
+  },
+  "favicon": "/favicon.svg",
+  "colors": {
+    "primary": "#0C0C0C",
+    "light": "#FAFAFA",
+    "dark": "#111111",
+    "anchors": "#14F195"
+  },
+  "topbarCtaButton": {
+    "name": "back to shugo",
+    "url": "https://shugo.com"
+  },
+  "topbarLinks": [
+    {
+      "name": "GitHub",
+      "url": "https://github.com/shugo-protocol/shugo"
+    }
+  ],
+  "navigation": [
+    {
+      "group": "getting started",
+      "pages": [
+        "introduction",
+        "quickstart"
+      ]
+    },
+    {
+      "group": "architecture",
+      "pages": [
+        "zero-custody",
+        "velocity-caps"
+      ]
+    }
+  ],
+  "footerSocials": {
+    "x": "https://x.com",
+    "github": "https://github.com/shugo-protocol/shugo"
+  }
+}
