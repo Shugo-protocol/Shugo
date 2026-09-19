@@ -30,8 +30,8 @@ export default function Navbar() {
         <div className="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between">
           
           <div className="flex items-center gap-4">
-            <Link className="font-bold text-xl text-black dark:text-white hover:opacity-70 transition-opacity min-w-[80px]" href="/">
-              <ScrambleText japanese="守護" text="shugo"/>
+            <Link className="font-bold text-xl text-black dark:text-white hover:opacity-70 transition-opacity min-w-[100px]" href="/">
+              <ScrambleText text="shugo" japanese="守護" hindi="शुगो" />
             </Link>
             <nav className="hidden md:flex gap-4 text-zinc-500 dark:text-zinc-400">
               <Link className="hover:text-black dark:hover:text-white transition-colors" href="/docs">docs</Link>
@@ -43,7 +43,11 @@ export default function Navbar() {
 
           <div className="flex items-center gap-1">
             <ThemeToggle/>
-            <Link className="text-zinc-500 dark:text-zinc-400 hover:text-black dark:hover:text-white transition-colors ml-2" href="https://github.com" target="_blank">
+            <Link 
+              className="text-zinc-500 dark:text-zinc-400 hover:text-black dark:hover:text-white transition-colors ml-2" 
+              href="https://github.com/Shugo-protocol/Shugo" 
+              target="_blank"
+            >
               <GithubIcon size={18} />
             </Link>
           </div>

@@ -13,6 +13,9 @@ const spaceMono = Space_Mono({
 export const metadata: Metadata = {
   title: "Shugo",
   description: "on-chain guardian for the agentic economy",
+  icons: {
+    icon: "/shugo.png"
+  }
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

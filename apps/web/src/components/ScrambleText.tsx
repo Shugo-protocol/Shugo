@@ -1,16 +1,19 @@
 "use client";
 import { useEffect, useState } from "react";
 
-const CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ守護0123456789@#$%&*";
+// Added Devanagari characters to the scramble matrix for an authentic glitch effect
+const CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ守護0123456789@#$%&*कखगघचछजझटठडढतथदधनपफबभमयरलवशषसह";
 
-export default function ScrambleText({ text, japanese }: { text: string, japanese: string }) {
+export default function ScrambleText({ text, japanese, hindi }: { text: string, japanese: string, hindi: string }) {
   const [displayText, setDisplayText] = useState(text);
-  const [showJapanese, setShowJapanese] = useState(false);
+  
+  // 0 = English (text), 1 = Japanese, 2 = Hindi
+  const [langIndex, setLangIndex] = useState(0);
 
-  // Toggle the target text every 5 seconds
+  // Cycle through the 3 states every 5 seconds
   useEffect(() => {
     const toggleInterval = setInterval(() => {
-      setShowJapanese((prev) => !prev);
+      setLangIndex((prev) => (prev + 1) % 3);
     }, 5000);
 
     return () => clearInterval(toggleInterval);
@@ -20,7 +23,8 @@ export default function ScrambleText({ text, japanese }: { text: string, japanes
   useEffect(() => {
     let iteration = 0;
     let scrambleInterval: NodeJS.Timeout;
-    const targetText = showJapanese ? japanese : text;
+    
+    const targetText = langIndex === 0 ? text : langIndex === 1 ? japanese : hindi;
 
     clearInterval(scrambleInterval!);
     
@@ -40,12 +44,11 @@ export default function ScrambleText({ text, japanese }: { text: string, japanes
         setDisplayText(targetText); // Ensure final string is perfect
       }
       
-      // Changed from 1/3 to 1/5 to make the letter reveal slower and more deliberate
       iteration += 1 / 5; 
-    }, 50); // Increased from 30ms to 50ms to calm down the flicker speed
+    }, 50);
 
     return () => clearInterval(scrambleInterval);
-  }, [showJapanese, text, japanese]);
+  }, [langIndex, text, japanese, hindi]);
 
   return (
     <span className="inline-block font-sans font-bold">
