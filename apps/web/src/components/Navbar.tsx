@@ -1,5 +1,9 @@
+"use client";
+
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { ArrowRight, Shield } from "lucide-react";
+import { usePathname } from "next/navigation";
+import { ArrowUpRight, ChevronDown, Menu, X } from "lucide-react";
 import ScrambleText from "./ScrambleText";
 import { ThemeToggle } from "./ThemeToggle";
 
@@ -20,40 +24,364 @@ const GithubIcon = ({ size = 20 }: { size?: number }) => (
   </svg>
 );
 
-export default function Navbar() {
+interface MenuOption {
+  title: string;
+  desc: string;
+  href: string;
+  external?: boolean;
+}
+
+const DOCS_ITEMS: MenuOption[] = [
+  {
+    title: "introduction",
+    desc: "zero-custody delegation protocol overview",
+    href: "https://docs.shugo.com/introduction",
+    external: true,
+  },
+  {
+    title: "quickstart",
+    desc: "deploy your first guardrail in under 5 minutes",
+    href: "https://docs.shugo.com/quickstart",
+    external: true,
+  },
+  {
+    title: "zero-custody",
+    desc: "solana subscriptions & allowances cpi mechanics",
+    href: "https://docs.shugo.com/zero-custody",
+    external: true,
+  },
+  {
+    title: "velocity caps",
+    desc: "epoch-based mathematical spend bounding",
+    href: "https://docs.shugo.com/velocity-caps",
+    external: true,
+  },
+];
+
+const CLI_ITEMS: MenuOption[] = [
+  {
+    title: "shugo init",
+    desc: "scaffold local agent policy workspaces",
+    href: "https://docs.shugo.com/quickstart",
+    external: true,
+  },
+  {
+    title: "shugo delegate",
+    desc: "sign and broadcast on-chain allowance policy",
+    href: "https://docs.shugo.com/quickstart",
+    external: true,
+  },
+  {
+    title: "shugo inspect",
+    desc: "stream real-time spend accumulators and epochs",
+    href: "https://docs.shugo.com/quickstart",
+    external: true,
+  },
+  {
+    title: "shugo revoke",
+    desc: "instant emergency key revocation via single instruction",
+    href: "https://docs.shugo.com/quickstart",
+    external: true,
+  },
+];
+
+const PROOFS_ITEMS: MenuOption[] = [
+  {
+    title: "kani model checker",
+    desc: "bounded verification runs eliminating panics & overflows",
+    href: "/proofs#kani",
+  },
+  {
+    title: "velocity invariants",
+    desc: "formal mathematical proof against balance exhaustion",
+    href: "/proofs#velocity",
+  },
+  {
+    title: "revocation soundness",
+    desc: "proof that revoked agent keys cannot sign or proxy cpis",
+    href: "/proofs#revocation",
+  },
+  {
+    title: "verification logs",
+    desc: "reproducible artifacts, harnesses, and test traces",
+    href: "/proofs#logs",
+  },
+];
+
+function DesktopDropdown({
+  label,
+  items,
+  mainHref,
+}: {
+  label: string;
+  items: MenuOption[];
+  mainHref: string;
+}) {
   return (
-    <header className="w-full bg-[#FFFFFF] dark:bg-[#0C0C0C] font-mono text-sm lowercase transition-colors">
-      
-      {/* Top Nav Row */}
+    <div className="relative group flex items-center h-14">
+      <Link
+        href={mainHref}
+        className="text-zinc-500 dark:text-zinc-400 group-hover:text-black dark:group-hover:text-white transition-colors flex items-center gap-1 py-2 text-xs xl:text-sm"
+      >
+        <span>{label}</span>
+        <ChevronDown
+          size={12}
+          className="transition-transform duration-200 group-hover:rotate-180 opacity-60 group-hover:opacity-100"
+        />
+      </Link>
+
+      {/* Bridge hitbox + dropdown container */}
+      <div className="absolute top-12 left-1/2 -translate-x-1/2 pt-2 hidden group-hover:block z-50 w-[460px] xl:w-[500px]">
+        <div className="bg-[#FFFFFF] dark:bg-[#0C0C0C] border border-zinc-200 dark:border-[#222] shadow-2xl p-2.5 grid grid-cols-2 gap-2 text-xs">
+          {items.map((item) => (
+            <Link
+              key={item.title}
+              href={item.href}
+              target={item.external ? "_blank" : undefined}
+              className="p-2.5 border border-transparent hover:border-zinc-200 dark:hover:border-[#222] hover:bg-zinc-50 dark:hover:bg-[#141414] transition-all flex flex-col justify-between group/card"
+            >
+              <div className="flex items-center justify-between text-black dark:text-white font-medium mb-1">
+                <span>{item.title}</span>
+                <ArrowUpRight
+                  size={12}
+                  className="opacity-0 group-hover/card:opacity-100 transition-opacity text-zinc-400"
+                />
+              </div>
+              <p className="text-zinc-500 dark:text-zinc-500 text-[11px] leading-relaxed">
+                {item.desc}
+              </p>
+            </Link>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function Navbar() {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [expandedSection, setExpandedSection] = useState<string | null>(null);
+  const pathname = usePathname();
+
+  // Close mobile drawer on route change
+  useEffect(() => {
+    setMobileMenuOpen(false);
+    setExpandedSection(null);
+  }, [pathname]);
+
+  // Lock scroll when mobile menu is open
+  useEffect(() => {
+    if (mobileMenuOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "unset";
+    }
+    return () => {
+      document.body.style.overflow = "unset";
+    };
+  }, [mobileMenuOpen]);
+
+  const toggleSection = (section: string) => {
+    setExpandedSection((prev) => (prev === section ? null : section));
+  };
+
+  return (
+    <header className="sticky top-0 z-40 w-full bg-[#FFFFFF] dark:bg-[#0C0C0C] font-mono text-sm lowercase">
       <div className="w-full border-b border-zinc-200 dark:border-[#222]">
-        {/* Changed max-w-6xl to max-w-7xl and fixed invalid px-[-10] to px-6 */}
-        <div className="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between">
-          
-          <div className="flex items-center gap-4">
-            <Link className="font-bold text-xl text-black dark:text-white hover:opacity-70 transition-opacity min-w-[100px]" href="/">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
+          {/* Logo & Desktop / Laptop Navigation */}
+          <div className="flex items-center gap-1 sm:gap-2 lg:gap-3">
+            <Link
+              className="font-bold text-lg sm:text-xl text-black dark:text-white hover:opacity-70 transition-opacity min-w-[95px] sm:min-w-[105px]"
+              href="/"
+            >
               <ScrambleText text="shugo" japanese="守護" hindi="शुगो" />
             </Link>
-            <nav className="hidden md:flex gap-4 text-zinc-500 dark:text-zinc-400">
-              <Link className="hover:text-black dark:hover:text-white transition-colors" href="/docs">docs</Link>
-              <Link className="hover:text-black dark:hover:text-white transition-colors" href="/cli">cli</Link>
-              <Link className="hover:text-black dark:hover:text-white transition-colors" href="/dashboard">dashboard</Link>
-              <Link className="hover:text-black dark:hover:text-white transition-colors" href="/proofs">proofs</Link>
+
+            {/* Laptop & PC Navigation (Hidden below lg breakpoint) */}
+            <nav className="hidden lg:flex items-center gap-5 xl:gap-6">
+              <DesktopDropdown
+                label="docs"
+                mainHref="https://docs.shugo.com"
+                items={DOCS_ITEMS}
+              />
+              <DesktopDropdown
+                label="cli"
+                mainHref="https://docs.shugo.com/quickstart"
+                items={CLI_ITEMS}
+              />
+              <Link
+                className="text-zinc-500 dark:text-zinc-400 hover:text-black dark:hover:text-white transition-colors text-xs xl:text-sm"
+                href="/dashboard"
+              >
+                dashboard
+              </Link>
+              <DesktopDropdown
+                label="proofs"
+                mainHref="/proofs"
+                items={PROOFS_ITEMS}
+              />
             </nav>
           </div>
 
-          <div className="flex items-center gap-1">
-            <ThemeToggle/>
-            <Link 
-              className="text-zinc-500 dark:text-zinc-400 hover:text-black dark:hover:text-white transition-colors ml-2" 
-              href="https://github.com/Shugo-protocol/Shugo" 
+          {/* Actions & Mobile/Tablet Toggle */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            <ThemeToggle />
+
+            <Link
+              className="text-zinc-500 dark:text-zinc-400 hover:text-black dark:hover:text-white transition-colors p-1.5"
+              href="https://github.com/Shugo-protocol/Shugo"
               target="_blank"
+              aria-label="GitHub Repository"
             >
               <GithubIcon size={18} />
             </Link>
+
+            {/* Mobile & Tablet Hamburger Toggle (Visible below lg) */}
+            <button
+              onClick={() => setMobileMenuOpen((prev) => !prev)}
+              aria-label="Toggle navigation menu"
+              className="lg:hidden p-1.5 text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white transition-colors"
+            >
+              {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+            </button>
           </div>
         </div>
       </div>
-      
+
+      {/* Mobile & Tablet Drawer */}
+      {mobileMenuOpen && (
+        <div className="lg:hidden fixed inset-x-0 top-14 bottom-0 bg-[#FFFFFF] dark:bg-[#0C0C0C] border-b border-zinc-200 dark:border-[#222] overflow-y-auto px-4 py-6 z-50 flex flex-col justify-between">
+          <div className="space-y-3">
+            {/* Accordion 1: Docs */}
+            <div className="border border-zinc-200 dark:border-[#222]">
+              <button
+                onClick={() => toggleSection("docs")}
+                className="w-full flex items-center justify-between p-3.5 text-left font-medium text-black dark:text-white hover:bg-zinc-50 dark:hover:bg-[#141414] transition-colors"
+              >
+                <span>docs</span>
+                <ChevronDown
+                  size={16}
+                  className={`transition-transform duration-200 ${
+                    expandedSection === "docs" ? "rotate-180" : ""
+                  }`}
+                />
+              </button>
+              {expandedSection === "docs" && (
+                <div className="p-2 border-t border-zinc-200 dark:border-[#222] bg-zinc-50/50 dark:bg-[#111] grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {DOCS_ITEMS.map((item) => (
+                    <Link
+                      key={item.title}
+                      href={item.href}
+                      target={item.external ? "_blank" : undefined}
+                      className="p-2.5 bg-white dark:bg-[#0C0C0C] border border-zinc-200 dark:border-[#222] hover:border-black dark:hover:border-white transition-all flex flex-col justify-between"
+                    >
+                      <div className="flex items-center justify-between font-medium text-black dark:text-white text-xs mb-1">
+                        <span>{item.title}</span>
+                        <ArrowUpRight size={12} className="text-zinc-400" />
+                      </div>
+                      <p className="text-[11px] text-zinc-500 leading-snug">
+                        {item.desc}
+                      </p>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Accordion 2: CLI */}
+            <div className="border border-zinc-200 dark:border-[#222]">
+              <button
+                onClick={() => toggleSection("cli")}
+                className="w-full flex items-center justify-between p-3.5 text-left font-medium text-black dark:text-white hover:bg-zinc-50 dark:hover:bg-[#141414] transition-colors"
+              >
+                <span>cli</span>
+                <ChevronDown
+                  size={16}
+                  className={`transition-transform duration-200 ${
+                    expandedSection === "cli" ? "rotate-180" : ""
+                  }`}
+                />
+              </button>
+              {expandedSection === "cli" && (
+                <div className="p-2 border-t border-zinc-200 dark:border-[#222] bg-zinc-50/50 dark:bg-[#111] grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {CLI_ITEMS.map((item) => (
+                    <Link
+                      key={item.title}
+                      href={item.href}
+                      target={item.external ? "_blank" : undefined}
+                      className="p-2.5 bg-white dark:bg-[#0C0C0C] border border-zinc-200 dark:border-[#222] hover:border-black dark:hover:border-white transition-all flex flex-col justify-between"
+                    >
+                      <div className="flex items-center justify-between font-medium text-black dark:text-white text-xs mb-1">
+                        <span>{item.title}</span>
+                        <ArrowUpRight size={12} className="text-zinc-400" />
+                      </div>
+                      <p className="text-[11px] text-zinc-500 leading-snug">
+                        {item.desc}
+                      </p>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Link: Dashboard */}
+            <Link
+              href="/dashboard"
+              className="block p-3.5 border border-zinc-200 dark:border-[#222] font-medium text-black dark:text-white hover:bg-zinc-50 dark:hover:bg-[#141414] transition-colors"
+            >
+              dashboard
+            </Link>
+
+            {/* Accordion 3: Proofs */}
+            <div className="border border-zinc-200 dark:border-[#222]">
+              <button
+                onClick={() => toggleSection("proofs")}
+                className="w-full flex items-center justify-between p-3.5 text-left font-medium text-black dark:text-white hover:bg-zinc-50 dark:hover:bg-[#141414] transition-colors"
+              >
+                <span>proofs</span>
+                <ChevronDown
+                  size={16}
+                  className={`transition-transform duration-200 ${
+                    expandedSection === "proofs" ? "rotate-180" : ""
+                  }`}
+                />
+              </button>
+              {expandedSection === "proofs" && (
+                <div className="p-2 border-t border-zinc-200 dark:border-[#222] bg-zinc-50/50 dark:bg-[#111] grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {PROOFS_ITEMS.map((item) => (
+                    <Link
+                      key={item.title}
+                      href={item.href}
+                      className="p-2.5 bg-white dark:bg-[#0C0C0C] border border-zinc-200 dark:border-[#222] hover:border-black dark:hover:border-white transition-all flex flex-col justify-between"
+                    >
+                      <div className="flex items-center justify-between font-medium text-black dark:text-white text-xs mb-1">
+                        <span>{item.title}</span>
+                        <ArrowUpRight size={12} className="text-zinc-400" />
+                      </div>
+                      <p className="text-[11px] text-zinc-500 leading-snug">
+                        {item.desc}
+                      </p>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Drawer Footer Info */}
+          <div className="mt-8 pt-4 border-t border-zinc-200 dark:border-[#222] text-xs text-zinc-500 flex items-center justify-between">
+            <span>shugo / 守護 / शुगो</span>
+            <Link
+              href="https://github.com/Shugo-protocol/Shugo"
+              target="_blank"
+              className="hover:text-black dark:hover:text-white transition-colors"
+            >
+              github.com/Shugo-protocol/Shugo
+            </Link>
+          </div>
+        </div>
+      )}
     </header>
   );
 }

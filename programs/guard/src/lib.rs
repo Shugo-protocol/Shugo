@@ -11,7 +11,7 @@ use instructions::*;
 // as "not real yet". Run `anchor build` then `anchor keys sync` to replace
 // this with the pubkey Anchor actually generated for you, then `anchor
 // build` again so the on-chain program agrees with this declaration.
-declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
+declare_id!("6gHABW3Rn5dsTdXKN2xzRdb4g9v2DjYmc9sKq1Wn8my9");
 
 #[program]
 pub mod guard {

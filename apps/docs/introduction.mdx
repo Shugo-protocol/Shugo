@@ -1,0 +1,37 @@
+---
+title: 'introduction'
+description: 'on-chain guardrails for the agentic economy'
+---
+
+## the problem
+
+giving autonomous ai agents direct access to private keys is a catastrophic security risk. whether an agent hallucinates, falls victim to prompt injection, or encounters a malicious target contract, a fully custodial agent wallet means your entire treasury is exposed. 
+
+traditional multisigs require human intervention, defeating the purpose of autonomy. custodial hot wallets are reckless. 
+
+## the solution
+
+**shugo (守護)** is a zero-custody policy delegation protocol built on solana. instead of giving an ai agent a wallet containing funds, you give it an *allowance* tied to strict, on-chain cryptographic rules.
+
+shugo leverages solana's official **subscriptions & allowances (s&a)** program to provide a velocity limitation layer, formally verified via aws kani.
+
+<CardGroup cols={2}>
+  <Card title="zero custody" icon="key">
+    agents never hold the private keys to the treasury. access is delegated via cpi and can be instantly revoked.
+  </Card>
+  <Card title="velocity caps" icon="shield">
+    enforce hard limits on how much value an agent can move per epoch, bounding maximum potential loss.
+  </Card>
+  <Card title="target allowlists" icon="crosshairs">
+    restrict agents to specific pre-approved smart contracts (e.g., only jupiter routing or raydium pools).
+  </Card>
+  <Card title="formal verification" icon="check-double">
+    core program logic is formally verified via aws kani to guarantee policy enforcement mathematically.
+  </Card>
+</CardGroup>
+
+## how it works
+
+1. **the treasury (human):** a standard solana wallet or multisig holding funds.
+2. **the guardrail (shugo):** an on-chain policy that defines exactly what the agent is allowed to do.
+3. **the agent (ai):** a lightweight keypair that signs transactions. the treasury delegates execution authority to this keypair, bounded by the shugo policy.
