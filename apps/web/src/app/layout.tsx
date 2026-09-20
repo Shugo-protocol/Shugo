@@ -20,7 +20,6 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    // suppressHydrationWarning is required for next-themes
     <html lang="en" suppressHydrationWarning>
       <body className={`${spaceMono.className} bg-white dark:bg-zinc-950 text-black dark:text-white antialiased transition-colors`}>
         <Providers>
