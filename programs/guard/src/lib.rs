@@ -41,6 +41,24 @@ pub mod guard {
         instructions::set_paused::handler(ctx, paused)
     }
 
+    pub fn update_policy(
+        ctx: Context<UpdatePolicy>,
+        agent: Pubkey,
+        per_call_cap: u64,
+        velocity_cap: u64,
+        velocity_window_s: i64,
+        destinations: Vec<Pubkey>,
+    ) -> Result<()> {
+        instructions::update_policy::handler(
+            ctx,
+            agent,
+            per_call_cap,
+            velocity_cap,
+            velocity_window_s,
+            destinations,
+        )
+    }
+
     pub fn execute_pull(ctx: Context<ExecutePull>, amount: u64, destination: Pubkey) -> Result<()> {
         instructions::execute_pull::handler(ctx, amount, destination)
     }

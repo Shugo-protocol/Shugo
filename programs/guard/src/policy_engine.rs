@@ -68,8 +68,18 @@ pub fn evaluate(policy: &PolicyView, now: i64, amount: u64, destination: Pubkey)
         return Decision::Deny(DenyReason::ExceedsVelocityCap);
     }
 
-    let allowed = &policy.destinations[..policy.destination_count as usize];
-    if !allowed.contains(&destination) {
+    // Loop over the fixed array size, not a runtime-length slice — a
+    // symbolic-length slice iteration is exactly what makes Kani's
+    // unwinder spin forever, since it can't see a compile-time bound.
+    // Behavior is identical either way; this form just makes the bound
+    // visible to the verifier as well as to a human reader.
+    let mut destination_allowed = false;
+    for i in 0..MAX_DESTINATIONS {
+        if i < policy.destination_count as usize && policy.destinations[i] == destination {
+            destination_allowed = true;
+        }
+    }
+    if !destination_allowed {
         return Decision::Deny(DenyReason::DestinationNotAllowed);
     }
 
@@ -85,12 +95,11 @@ mod verification {
     /// refactor can't quietly let a denied case slip through the Allow arm.
     /// Same shape of proof as AgentTrust's `gate_payment_strict_correctness`.
     ///
-    /// NOTE, unverified by me (no Kani in this environment): `Pubkey` may not
-    /// implement `kani::Arbitrary` out of the box depending on the
-    /// anchor-lang/solana-program version Anchor just installed for you. If
-    /// `cargo kani` complains about that on first run, swap `Pubkey` for a
-    /// raw `[u8; 32]` inside this harness only — `evaluate` itself keeps
-    /// using `Pubkey`, since only the harness needs to be symbolic-friendly.
+    /// NOTE: `Pubkey` (from `anchor_lang`, wrapping the older `solana-program`
+    /// generation) does not implement `kani::Arbitrary` — confirmed by
+    /// actually running `cargo kani`, not assumed. Generating raw `[u8; 32]`
+    /// and converting with `Pubkey::new_from_array` sidesteps it; only this
+    /// harness needs to be symbolic-friendly, `evaluate` itself is untouched.
     #[kani::proof]
     fn evaluate_correctness() {
         let paused: bool = kani::any();
@@ -102,10 +111,14 @@ mod verification {
         let destination_count: u8 = kani::any();
         kani::assume((destination_count as usize) <= MAX_DESTINATIONS);
 
-        let destinations: [Pubkey; MAX_DESTINATIONS] = kani::any();
+        let destination_bytes: [[u8; 32]; MAX_DESTINATIONS] = kani::any();
+        let destinations: [Pubkey; MAX_DESTINATIONS] = destination_bytes.map(Pubkey::new_from_array);
+
+        let destination_raw: [u8; 32] = kani::any();
+        let destination = Pubkey::new_from_array(destination_raw);
+
         let now: i64 = kani::any();
         let amount: u64 = kani::any();
-        let destination: Pubkey = kani::any();
 
         let policy = PolicyView {
             paused,
@@ -124,7 +137,15 @@ mod verification {
         let pulled_before = if window_reset { 0 } else { window_pulled };
         let sum_ok = pulled_before.checked_add(amount).is_some();
         let new_pulled = pulled_before.checked_add(amount).unwrap_or(u64::MAX);
-        let dest_ok = destinations[..destination_count as usize].contains(&destination);
+        let dest_ok = {
+            let mut ok = false;
+            for i in 0..MAX_DESTINATIONS {
+                if i < destination_count as usize && destinations[i] == destination {
+                    ok = true;
+                }
+            }
+            ok
+        };
 
         let should_allow = !paused
             && amount <= per_call_cap
@@ -133,8 +154,12 @@ mod verification {
             && dest_ok;
 
         match evaluate(&policy, now, amount, destination) {
-            Decision::Allow { .. } => assert!(should_allow),
-            Decision::Deny(_) => assert!(!should_allow),
+            Decision::Allow { .. } => {
+                assert!(should_allow);
+            }
+            Decision::Deny(_) => {
+                assert!(!should_allow);
+            }
         }
     }
 }

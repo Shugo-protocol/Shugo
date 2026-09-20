@@ -61,6 +61,8 @@ const TRANSFER_FIXED_DISC: u8 = 4;
 // Our own Anchor sighashes — computed with sha256("global:<name>")[..8], not guessed.
 const INIT_POLICY_DISC: [u8; 8] = [0x2d, 0xea, 0x6e, 0x64, 0xd1, 0x92, 0xbf, 0x56];
 const EXECUTE_PULL_DISC: [u8; 8] = [0xb6, 0x35, 0x35, 0xf5, 0x8e, 0x9b, 0xf0, 0x9a];
+const SET_PAUSED_DISC: [u8; 8] = [0x5b, 0x3c, 0x7d, 0xc0, 0xb0, 0xe1, 0xa6, 0xda];
+const UPDATE_POLICY_DISC: [u8; 8] = [0xd4, 0xf5, 0xf6, 0x07, 0xa3, 0x97, 0x12, 0x39];
 
 // Seeds — `state/subscription_authority.rs:47`, `state/common.rs:10`,
 // `event_engine.rs:44` (`EVENT_AUTHORITY_SEED`).
@@ -152,6 +154,16 @@ fn send(svm: &mut LiteSVM, signers: &[&Keypair], payer: &Pubkey, ix: Instruction
     let result = svm.send_transaction(tx);
     svm.expire_blockhash();
     result
+}
+
+fn advance_clock(svm: &mut LiteSVM, seconds: i64) {
+    let mut clock = svm.get_sysvar::<solana_clock::Clock>();
+    clock.unix_timestamp += seconds;
+    // Bump slot too, matching the real repo's own `move_clock_forward` —
+    // neither our checks nor S&A's read slot directly, but there's no
+    // reason to diverge from a pattern already proven not to confuse LiteSVM.
+    clock.slot += (seconds as u64) * 2;
+    svm.set_sysvar::<solana_clock::Clock>(&clock);
 }
 
 // ---------------------------------------------------------------------
@@ -351,6 +363,60 @@ fn build_execute_pull_ix(
     }
 }
 
+/// Our own `set_paused` — account order matches `SetPaused` in
+/// `instructions/set_paused.rs`: human, policy.
+fn build_set_paused_ix(human: &Pubkey, policy: &Pubkey, paused: bool) -> Instruction {
+    #[derive(BorshSerialize)]
+    struct Args {
+        paused: bool,
+    }
+    let mut data = SET_PAUSED_DISC.to_vec();
+    Args { paused }.serialize(&mut data).unwrap();
+
+    Instruction {
+        program_id: guard_program_id(),
+        accounts: vec![AccountMeta::new_readonly(*human, true), AccountMeta::new(*policy, false)],
+        data,
+    }
+}
+
+/// Our own `update_policy` — account order matches `UpdatePolicy` in
+/// `instructions/update_policy.rs`: human, policy.
+#[allow(clippy::too_many_arguments)]
+fn build_update_policy_ix(
+    human: &Pubkey,
+    policy: &Pubkey,
+    agent: &Pubkey,
+    per_call_cap: u64,
+    velocity_cap: u64,
+    velocity_window_s: i64,
+    destinations: &[Pubkey],
+) -> Instruction {
+    #[derive(BorshSerialize)]
+    struct Args {
+        agent: [u8; 32],
+        per_call_cap: u64,
+        velocity_cap: u64,
+        velocity_window_s: i64,
+        destinations: Vec<[u8; 32]>,
+    }
+    let args = Args {
+        agent: agent.to_bytes(),
+        per_call_cap,
+        velocity_cap,
+        velocity_window_s,
+        destinations: destinations.iter().map(|d| d.to_bytes()).collect(),
+    };
+    let mut data = UPDATE_POLICY_DISC.to_vec();
+    args.serialize(&mut data).unwrap();
+
+    Instruction {
+        program_id: guard_program_id(),
+        accounts: vec![AccountMeta::new_readonly(*human, true), AccountMeta::new(*policy, false)],
+        data,
+    }
+}
+
 // ---------------------------------------------------------------------
 // The test.
 // ---------------------------------------------------------------------
@@ -484,4 +550,246 @@ fn execute_pull_denies_a_destination_not_on_the_allowlist() {
     let result = send(&mut svm, &[&bob], &bob.pubkey(), pull_ix);
     assert!(result.is_err(), "pulling to a non-allowlisted destination should be denied");
     assert_eq!(ata_balance(&svm, &eve_ata), 0);
+}
+
+/// Shared scaffolding for the tests below: a policy plus a real delegation
+/// naming it as delegatee, ready for `execute_pull` calls. Returns everything
+/// a test needs to build its own pull instructions.
+struct Scenario {
+    svm: LiteSVM,
+    alice: Keypair,
+    bob: Keypair,
+    mint: Pubkey,
+    alice_ata: Pubkey,
+    charlie_ata: Pubkey,
+    policy: Pubkey,
+    delegation: Pubkey,
+    sa_pda: Pubkey,
+}
+
+fn build_scenario(per_call_cap: u64, velocity_cap: u64, velocity_window_s: i64, delegation_amount: u64) -> Scenario {
+    let mut svm = setup();
+
+    let alice = Keypair::new();
+    let bob = Keypair::new();
+    svm.airdrop(&alice.pubkey(), 10 * LAMPORTS_PER_SOL).unwrap();
+    svm.airdrop(&bob.pubkey(), 10 * LAMPORTS_PER_SOL).unwrap();
+
+    let mint = init_mint(&mut svm, alice.pubkey(), 6, 1_000_000_000);
+    let alice_ata = init_ata(&mut svm, mint, alice.pubkey(), 500_000_000);
+    let charlie = Pubkey::new_unique();
+    let charlie_ata = init_ata(&mut svm, mint, charlie, 0);
+
+    let policy_id = 0u64;
+    let (policy, _) = policy_pda(&alice.pubkey(), &mint, policy_id);
+    let init_policy_ix = build_init_policy_ix(
+        &alice.pubkey(),
+        &mint,
+        &policy,
+        policy_id,
+        &bob.pubkey(),
+        per_call_cap,
+        velocity_cap,
+        velocity_window_s,
+        &[charlie_ata],
+    );
+    send(&mut svm, &[&alice], &alice.pubkey(), init_policy_ix).expect("init_policy failed");
+
+    send(&mut svm, &[&alice], &alice.pubkey(), build_init_subscription_authority_ix(&alice.pubkey(), &mint, &alice_ata))
+        .expect("initialize_subscription_authority failed");
+
+    let expiry_ts = current_ts() + 86_400;
+    let (create_ix, delegation) =
+        build_create_fixed_delegation_ix(&alice.pubkey(), &mint, &policy, 0, delegation_amount, expiry_ts, 0);
+    send(&mut svm, &[&alice], &alice.pubkey(), create_ix).expect("create_fixed_delegation failed");
+
+    let (sa_pda, _) = subscription_authority_pda(&alice.pubkey(), &mint);
+
+    Scenario { svm, alice, bob, mint, alice_ata, charlie_ata, policy, delegation, sa_pda }
+}
+
+#[test]
+fn execute_pull_denies_amount_over_per_call_cap() {
+    // per_call_cap = 20M, velocity_cap generous, delegation generous — the
+    // per-call check should be the thing that fires, nothing else.
+    let mut s = build_scenario(20_000_000, 100_000_000, 3600, 100_000_000);
+
+    let pull_ix = build_execute_pull_ix(
+        &s.bob.pubkey(),
+        &s.policy,
+        &s.delegation,
+        &s.sa_pda,
+        &s.alice_ata,
+        &s.charlie_ata,
+        &s.mint,
+        &event_authority_pda(),
+        30_000_000, // over the 20M per_call_cap
+        &s.charlie_ata,
+    );
+    let result = send(&mut s.svm, &[&s.bob], &s.bob.pubkey(), pull_ix);
+    assert!(result.is_err(), "amount over per_call_cap should be denied");
+    assert_eq!(ata_balance(&s.svm, &s.charlie_ata), 0);
+}
+
+#[test]
+fn execute_pull_enforces_velocity_cap_across_two_pulls() {
+    // per_call_cap alone would allow either pull; velocity_cap = 40M is what
+    // should stop the SECOND one, since 30M + 30M > 40M in the same window.
+    let mut s = build_scenario(30_000_000, 40_000_000, 3600, 100_000_000);
+
+    let first = build_execute_pull_ix(
+        &s.bob.pubkey(),
+        &s.policy,
+        &s.delegation,
+        &s.sa_pda,
+        &s.alice_ata,
+        &s.charlie_ata,
+        &s.mint,
+        &event_authority_pda(),
+        30_000_000,
+        &s.charlie_ata,
+    );
+    let result = send(&mut s.svm, &[&s.bob], &s.bob.pubkey(), first);
+    assert!(result.is_ok(), "first pull within velocity_cap should succeed: {:?}", result.err());
+    assert_eq!(ata_balance(&s.svm, &s.charlie_ata), 30_000_000);
+
+    // No clock advance — same window. 30M + 30M = 60M > 40M velocity_cap.
+    let second = build_execute_pull_ix(
+        &s.bob.pubkey(),
+        &s.policy,
+        &s.delegation,
+        &s.sa_pda,
+        &s.alice_ata,
+        &s.charlie_ata,
+        &s.mint,
+        &event_authority_pda(),
+        30_000_000,
+        &s.charlie_ata,
+    );
+    let result = send(&mut s.svm, &[&s.bob], &s.bob.pubkey(), second);
+    assert!(result.is_err(), "second pull should be denied by the velocity cap, not S&A's own per-delegation cap");
+    // Balance stays at exactly the first pull's amount — the second never landed.
+    assert_eq!(ata_balance(&s.svm, &s.charlie_ata), 30_000_000);
+
+    // Advance past the velocity window — the cap should no longer apply to
+    // a pull that starts a fresh window, proving this is a rolling window
+    // and not a one-time lifetime limit.
+    advance_clock(&mut s.svm, 3601);
+    let third = build_execute_pull_ix(
+        &s.bob.pubkey(),
+        &s.policy,
+        &s.delegation,
+        &s.sa_pda,
+        &s.alice_ata,
+        &s.charlie_ata,
+        &s.mint,
+        &event_authority_pda(),
+        30_000_000,
+        &s.charlie_ata,
+    );
+    let result = send(&mut s.svm, &[&s.bob], &s.bob.pubkey(), third);
+    assert!(result.is_ok(), "a new window should reset the velocity cap: {:?}", result.err());
+    assert_eq!(ata_balance(&s.svm, &s.charlie_ata), 60_000_000);
+}
+
+#[test]
+fn execute_pull_denies_when_paused() {
+    let mut s = build_scenario(50_000_000, 50_000_000, 3600, 100_000_000);
+
+    let pause_ix = build_set_paused_ix(&s.alice.pubkey(), &s.policy, true);
+    send(&mut s.svm, &[&s.alice], &s.alice.pubkey(), pause_ix).expect("set_paused(true) failed");
+
+    let pull_ix = build_execute_pull_ix(
+        &s.bob.pubkey(),
+        &s.policy,
+        &s.delegation,
+        &s.sa_pda,
+        &s.alice_ata,
+        &s.charlie_ata,
+        &s.mint,
+        &event_authority_pda(),
+        10_000_000,
+        &s.charlie_ata,
+    );
+    let result = send(&mut s.svm, &[&s.bob], &s.bob.pubkey(), pull_ix);
+    assert!(result.is_err(), "a paused policy should deny every pull, regardless of amount or destination");
+    assert_eq!(ata_balance(&s.svm, &s.charlie_ata), 0);
+}
+
+#[test]
+fn execute_pull_denies_a_signer_who_is_not_the_registered_agent() {
+    let mut s = build_scenario(50_000_000, 50_000_000, 3600, 100_000_000);
+
+    // Mallory has no relationship to this policy at all — never registered
+    // as its agent. `has_one = agent` on the Policy account should reject
+    // her before evaluate() even runs.
+    let mallory = Keypair::new();
+    s.svm.airdrop(&mallory.pubkey(), LAMPORTS_PER_SOL).unwrap();
+
+    let pull_ix = build_execute_pull_ix(
+        &mallory.pubkey(),
+        &s.policy,
+        &s.delegation,
+        &s.sa_pda,
+        &s.alice_ata,
+        &s.charlie_ata,
+        &s.mint,
+        &event_authority_pda(),
+        10_000_000,
+        &s.charlie_ata,
+    );
+    let result = send(&mut s.svm, &[&mallory], &mallory.pubkey(), pull_ix);
+    assert!(result.is_err(), "a signer who isn't the registered agent should be rejected");
+    assert_eq!(ata_balance(&s.svm, &s.charlie_ata), 0);
+}
+
+#[test]
+fn update_policy_changes_take_effect_on_the_next_pull() {
+    let mut s = build_scenario(50_000_000, 50_000_000, 3600, 100_000_000);
+
+    let dave = Pubkey::new_unique();
+    let dave_ata = init_ata(&mut s.svm, s.mint, dave, 0);
+
+    // Swap the allowlist from [charlie_ata] to [dave_ata] — nothing else
+    // about the policy or the underlying delegation changes.
+    let update_ix =
+        build_update_policy_ix(&s.alice.pubkey(), &s.policy, &s.bob.pubkey(), 50_000_000, 50_000_000, 3600, &[
+            dave_ata,
+        ]);
+    send(&mut s.svm, &[&s.alice], &s.alice.pubkey(), update_ix).expect("update_policy failed");
+
+    // The OLD destination is now rejected — proves the update actually took
+    // effect rather than the old allowlist silently still being honored.
+    let pull_to_charlie = build_execute_pull_ix(
+        &s.bob.pubkey(),
+        &s.policy,
+        &s.delegation,
+        &s.sa_pda,
+        &s.alice_ata,
+        &s.charlie_ata,
+        &s.mint,
+        &event_authority_pda(),
+        10_000_000,
+        &s.charlie_ata,
+    );
+    let result = send(&mut s.svm, &[&s.bob], &s.bob.pubkey(), pull_to_charlie);
+    assert!(result.is_err(), "charlie was removed from the allowlist by update_policy");
+    assert_eq!(ata_balance(&s.svm, &s.charlie_ata), 0);
+
+    // The NEW destination works.
+    let pull_to_dave = build_execute_pull_ix(
+        &s.bob.pubkey(),
+        &s.policy,
+        &s.delegation,
+        &s.sa_pda,
+        &s.alice_ata,
+        &dave_ata,
+        &s.mint,
+        &event_authority_pda(),
+        10_000_000,
+        &dave_ata,
+    );
+    let result = send(&mut s.svm, &[&s.bob], &s.bob.pubkey(), pull_to_dave);
+    assert!(result.is_ok(), "dave was added to the allowlist by update_policy: {:?}", result.err());
+    assert_eq!(ata_balance(&s.svm, &dave_ata), 10_000_000);
 }
