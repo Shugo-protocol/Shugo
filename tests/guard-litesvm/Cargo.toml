@@ -1,0 +1,34 @@
+[package]
+name = "guard-litesvm-tests"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# Empty [workspace] table: this tells Cargo "stop here, this is its own
+# workspace root" even though it's physically nested inside the guard
+# workspace's directory tree. Without this, Cargo auto-detects it as a
+# member of the parent workspace by location alone (regardless of the
+# `members` list) and merges both lockfiles anyway — which is what caused
+# the last two rounds of version conflicts.
+[workspace]
+
+# Deliberately isolated from programs/guard/Cargo.toml — this crate is what
+# needs litesvm's newer solana-* dependency chain, and the on-chain guard
+# program is what needs anchor-lang's older one. Keeping them in separate
+# workspace members means Cargo never has to resolve both chains into one
+# Cargo.lock, which is exactly what caused the `subtle` version conflict.
+[dependencies]
+litesvm = "^0.12"
+borsh = { version = "1.6", features = ["derive"] }
+solana-account = "~3.4"
+solana-clock = "^3"
+solana-instruction = "^3"
+solana-keypair = "=3.1.2"
+solana-message = "^3.1"
+solana-native-token = "^3"
+solana-program-pack = "^3"
+solana-pubkey = "^4"
+solana-signer = "^3"
+solana-transaction = "^3"
+spl-associated-token-account-interface = "2.0.0"
+spl-token-2022-interface = "3.0.0"

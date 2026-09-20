@@ -32,7 +32,13 @@ pub struct ExecutePull<'info> {
     /// CHECK: S&A's FixedDelegation PDA; validated by S&A during the CPI.
     #[account(mut)]
     pub delegation: UncheckedAccount<'info>,
-    /// CHECK: S&A's SubscriptionAuthority PDA; validated by S&A.
+    /// CHECK: S&A's SubscriptionAuthority PDA; validated by S&A. Marked
+    /// `mut` to match the real, proven-working `TransferDelegation::execute`
+    /// helper in the S&A test suite — its own `writable_accounts_must_be_writable`
+    /// test's template marks this readonly, but that's the minimum, not what
+    /// every passing transfer test actually sends. Writable is always a safe
+    /// superset; the reverse would fail at the CPI privilege check.
+    #[account(mut)]
     pub subscription_authority: UncheckedAccount<'info>,
     /// CHECK: the human's token account for `policy.mint`; validated by S&A.
     #[account(mut)]
@@ -111,7 +117,7 @@ pub fn handler(ctx: Context<ExecutePull>, amount: u64, destination: Pubkey) -> R
         program_id: ctx.accounts.subscriptions_program.key(),
         accounts: vec![
             AccountMeta::new(ctx.accounts.delegation.key(), false),
-            AccountMeta::new_readonly(ctx.accounts.subscription_authority.key(), false),
+            AccountMeta::new(ctx.accounts.subscription_authority.key(), false),
             AccountMeta::new(ctx.accounts.delegator_ata.key(), false),
             AccountMeta::new(ctx.accounts.receiver_ata.key(), false),
             AccountMeta::new_readonly(mint_key, false),

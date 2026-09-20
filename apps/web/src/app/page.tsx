@@ -34,12 +34,12 @@ export default function Home() {
 
       {/* Main Headline (Font-normal as requested) */}
       <h1 className="text-4xl sm:text-5xl md:text-7xl font-normal tracking-tight max-w-6xl leading-tight px-2">
-        shugo on-chain guardrails <br className="hidden md:block" /> for ai agents
+        shugo: on-chain guardrails <br className="hidden md:block" /> for ai agents
       </h1>
       
-      <p className="mt-6 md:mt-8 text-zinc-500 dark:text-zinc-400 max-w-2xl text-base sm:text-lg md:text-xl leading-relaxed px-4">
-        a zero-custody policy engine. enforce cryptographic velocity caps and execution bounds directly on <span className="font-semibold bg-gradient-to-r from-[#9945FF] to-[#14F195] bg-clip-text text-transparent">solana</span>.
-      </p>
+      <p className="mt-6 md:mt-8 text-zinc-500 dark:text-zinc-400 max-w-2xl text-sm sm:text-base md:text-lg leading-relaxed px-4">
+  a zero-custody policy engine. enforce cryptographic velocity caps and execution bounds directly on <span className="font-semibold bg-gradient-to-r from-[#9945FF] to-[#14F195] bg-clip-text text-transparent">solana</span>.
+</p>
 
       {/* Interactive Copy Box */}
       <button 
@@ -71,20 +71,16 @@ export default function Home() {
         <ChevronDown size={16} className="mt-1 text-zinc-400 dark:text-zinc-600 animate-bounce" />
       </div>
 
-      {/* 
-        Grid Layout for Video & Sidebars
-        xl:grid-cols-[200px_1fr_200px] pushes the footers to the sides on large screens.
-      */}
       <div className="w-full max-w-[90rem] grid grid-cols-1 xl:grid-cols-[200px_1fr_200px] gap-8 mt-1 mb-12 xl:mb-24 px-0 md:px-12 items-end">
         
-        {/* Left Side "Footer" (Hidden on Mobile/Tablet) */}
+        {/* Left Side*/}
         <div className="hidden xl:flex flex-col gap-4 text-zinc-500 dark:text-zinc-600 text-sm text-left mb-16">
           <span className="font-bold text-black dark:text-white">shugo / 守護</span>
           <Link href="https://x.com" target="_blank" className="hover:text-black dark:hover:text-white hover:translate-x-1 transition-all">x (twitter)</Link>
           <span className="mt-6 text-xs">© 2026</span>
         </div>
 
-        {/* Center Column: Video Player */}
+        {/*Video Player */}
         <div className="flex flex-col items-center w-full max-w-6xl mx-auto">
           <div className="w-full aspect-video bg-[#FAFAFA] dark:bg-[#111111] border border-zinc-200 dark:border-[#222] flex items-center justify-center relative overflow-hidden transition-colors rounded-lg">
             <div className="absolute top-2 left-2 sm:top-4 sm:left-4 text-[10px] sm:text-xs font-bold bg-white dark:bg-black text-black dark:text-white px-2 py-1 border border-zinc-200 dark:border-[#222] rounded">
@@ -96,7 +92,7 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Right Side "Footer" (Hidden on Mobile/Tablet) */}
+        {/* Right Side*/}
         <div className="hidden xl:flex flex-col items-end gap-4 text-zinc-500 dark:text-zinc-600 text-sm text-right mb-16">
           <div className="flex items-center justify-end gap-2 mb-4">
             <span className="relative flex h-2 w-2">
@@ -111,7 +107,7 @@ export default function Home() {
 
       </div>
 
-      {/* Mobile & Tablet Footer (Visible only below XL screens) */}
+      {/* Mobile and Tablet*/}
       <div className="flex xl:hidden flex-col sm:flex-row items-center justify-between gap-8 w-full border-t border-zinc-200 dark:border-[#222] pt-8 pb-12 px-4 text-sm text-zinc-500 dark:text-zinc-600">
         <div className="flex flex-col items-center sm:items-start gap-2">
           <span className="font-bold text-black dark:text-white">shugo / 守護</span>
