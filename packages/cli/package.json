@@ -1,0 +1,24 @@
+{
+  "name": "@shugo/cli",
+  "version": "0.1.0",
+  "description": "CLI for Shugo — a policy guardrail layer for Solana's Subscriptions & Allowances program.",
+  "license": "MIT",
+  "type": "module",
+  "bin": { "shugo": "./dist/index.js" },
+  "files": ["dist", "README.md"],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@shugo/sdk": "workspace:*",
+    "@solana/web3.js": "^1.95.0",
+    "commander": "^12.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.2"
+  },
+  "publishConfig": { "access": "public" }
+}
