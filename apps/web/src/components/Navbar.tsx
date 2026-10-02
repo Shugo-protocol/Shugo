@@ -79,14 +79,16 @@ function FaqAccordion({ q, a }: { q: string; a: string }) {
 function DesktopDropdown({ label, items, mainHref }: { label: string; items: MenuOption[]; mainHref: string }) {
   return (
     <div className="relative group flex items-center h-14">
-      <Link href={mainHref} className="text-zinc-500 dark:text-zinc-400 group-hover:text-black dark:group-hover:text-white transition-colors flex items-center gap-1 py-2 text-xs xl:text-sm">
+      <Link href={mainHref} className="text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white hover:bg-zinc-100/80 dark:hover:bg-white/10 rounded-full transition-all duration-200 flex items-center gap-1 px-3.5 py-2 text-xs xl:text-[13px] font-medium">
         <span>{label}</span>
-        <ChevronDown size={12} className="transition-transform duration-200 group-hover:rotate-180 opacity-60 group-hover:opacity-100" />
+        <ChevronDown size={12} className="transition-transform duration-300 group-hover:rotate-180 opacity-60 group-hover:opacity-100" />
       </Link>
-      <div className="absolute top-12 left-1/2 -translate-x-1/2 pt-2 hidden group-hover:block z-50 w-[460px] xl:w-[500px]">
-        <div className="bg-[#FFFFFF] dark:bg-[#0C0C0C] border border-zinc-200 dark:border-[#222] shadow-2xl p-2.5 grid grid-cols-2 gap-2 text-xs">
+      
+      {/* Animated Dropdown Menu */}
+      <div className="absolute top-full left-1/2 -translate-x-1/2 pt-2 invisible opacity-0 translate-y-2 group-hover:visible group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300 ease-out z-50 w-[460px] xl:w-[500px]">
+        <div className="bg-[#FFFFFF] dark:bg-[#0C0C0C] border border-zinc-200 dark:border-[#222] shadow-2xl rounded-xl p-2.5 grid grid-cols-2 gap-2 text-xs">
           {items.map((item) => (
-            <Link key={item.title} href={item.href} target={item.external ? "_blank" : undefined} className="p-2.5 border border-transparent hover:border-zinc-200 dark:hover:border-[#222] hover:bg-zinc-50 dark:hover:bg-[#141414] transition-all flex flex-col justify-between group/card">
+            <Link key={item.title} href={item.href} target={item.external ? "_blank" : undefined} className="p-2.5 rounded-lg border border-transparent hover:border-zinc-200 dark:hover:border-[#222] hover:bg-zinc-50 dark:hover:bg-[#141414] transition-all flex flex-col justify-between group/card">
               <div className="flex items-center justify-between text-black dark:text-white font-medium mb-1">
                 <span>{item.title}</span>
                 <ArrowUpRight size={12} className="opacity-0 group-hover/card:opacity-100 transition-opacity text-zinc-400" />
@@ -100,14 +102,19 @@ function DesktopDropdown({ label, items, mainHref }: { label: string; items: Men
   );
 }
 
-// navbar hero page
 export default function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [faqOpen, setFaqOpen] = useState(false);
   const [expandedSection, setExpandedSection] = useState<string | null>(null);
+  const [isMounted, setIsMounted] = useState(false);
   const pathname = usePathname();
-
   
+  useEffect(() => {
+    // Trigger the entrance animation shortly after component mounts
+    const timer = setTimeout(() => setIsMounted(true), 100);
+    return () => clearTimeout(timer);
+  }, []);
+
   useEffect(() => {
     setMobileMenuOpen(false);
     setFaqOpen(false);
@@ -129,43 +136,52 @@ export default function Navbar() {
 
   return (
     <>
-      <header className="sticky top-0 z-40 w-full bg-[#FFFFFF] dark:bg-[#0C0C0C] font-mono text-sm lowercase">
-        <div className="w-full border-b border-zinc-200 dark:border-[#222]">
+      <header 
+        className={`fixed top-0 left-0 right-0 z-40 font-mono text-sm lowercase bg-transparent transition-all duration-[800ms] ease-out ${
+          isMounted ? "translate-y-0 opacity-100" : "-translate-y-8 opacity-0"
+        }`}
+      >
+        
+        {/* Refined Fading blurred background layer */}
+        <div className="absolute inset-x-0 top-0 h-32 bg-white/40 dark:bg-[#0C0C0C]/40 backdrop-blur-xl [mask-image:linear-gradient(to_bottom,black_40%,transparent_100%)] pointer-events-none -z-10" />
+
+        <div className="w-full">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
             
-            {/* Logo*/}
-            <div className="flex items-center gap-4 sm:gap-6 lg:gap-8">
-              <div className="flex items-center ">
-                <Link className="font-bold text-lg sm:text-xl text-black dark:text-white hover:opacity-70 transition-opacity min-w-[95px] sm:min-w-[105px]" href="/">
-                  <ScrambleText text="shugo" japanese="守護" hindi="शुगो" />
-                </Link>
-                <span className="-ml-[20px] hidden sm:flex items-center px-1.5 py-0.5 border border-[#14F195]/30 bg-[#14F195]/10 text-[#14F195] text-[11px] leading-none rounded-sm font-semibold">
-                  devnet
-                </span>
-              </div>
-
-              <nav className="hidden lg:flex items-center gap-5 xl:gap-6">
-                <DesktopDropdown label="docs" mainHref="https://docs.shugo.com" items={DOCS_ITEMS} />
-                <DesktopDropdown label="cli" mainHref="https://docs.shugo.com/quickstart" items={CLI_ITEMS} />
-                <DesktopDropdown label="proofs" mainHref="/proofs" items={PROOFS_ITEMS} />
-                <button onClick={() => setFaqOpen(true)} className="text-zinc-500 dark:text-zinc-400 hover:text-black dark:hover:text-white transition-colors text-xs xl:text-sm flex items-center gap-1.5">
-                  faq <HelpCircle size={14} />
-                </button>
-              </nav>
+            {/* Left: Logo */}
+            <div className="flex items-center justify-start flex-1">
+              <Link className="font-bold text-lg sm:text-xl text-black dark:text-white hover:opacity-70 transition-opacity" href="/">
+                <ScrambleText text="shugo" japanese="守護" hindi="शुगो" />
+              </Link>
+              <span className="ml-2 hidden sm:flex items-center px-1.5 py-0.5 border border-[#14F195]/30 bg-[#14F195]/10 text-[#14F195] text-[11px] leading-none rounded-sm font-semibold">
+                devnet
+              </span>
             </div>
 
-            <div className="flex items-center gap-1 sm:gap-1 lg:gap-2">
-              
-              <ThemeToggle />
+            {/* Center: Navigation */}
+            <nav className="hidden lg:flex items-center justify-center gap-1 xl:gap-2 flex-none">
+              <DesktopDropdown label="docs" mainHref="https://docs.shugo.com" items={DOCS_ITEMS} />
+              <DesktopDropdown label="cli" mainHref="https://docs.shugo.com/quickstart" items={CLI_ITEMS} />
+              <DesktopDropdown label="proofs" mainHref="/proofs" items={PROOFS_ITEMS} />
+              <div className="h-14 flex items-center">
+                <button onClick={() => setFaqOpen(true)} className="text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white hover:bg-zinc-100/80 dark:hover:bg-white/10 rounded-full transition-all duration-200 text-xs xl:text-[13px] font-medium flex items-center gap-1.5 px-3.5 py-2">
+                  faq <HelpCircle size={14} className="opacity-70" />
+                </button>
+              </div>
+            </nav>
 
-
-              <Link className="hidden sm:block text-zinc-500 dark:text-zinc-400 hover:text-black dark:hover:text-white transition-colors p-1.5" href="https://github.com/Shugo-protocol/Shugo" target="_blank" aria-label="GitHub">
+            {/* Right: Actions */}
+            <div className="flex items-center justify-end gap-2 sm:gap-3 flex-1">
+              <div className="hover:bg-zinc-100/80 dark:hover:bg-white/10 rounded-full transition-all p-1">
+                <ThemeToggle />
+              </div>
+              <Link className="hidden sm:flex text-zinc-500 dark:text-zinc-400 hover:text-black dark:hover:text-white hover:bg-zinc-100/80 dark:hover:bg-white/10 rounded-full transition-colors p-2" href="https://github.com/Shugo-protocol/Shugo" target="_blank" aria-label="GitHub">
                 <GithubIcon size={18} />
               </Link>
 
               <Link
                 href="/dashboard"
-                className="hidden lg:flex items-center gap-1.5 bg-[#14F195] hover:bg-[#10C97A] text-black px-3.5 py-1.5 text-xs xl:text-sm font-bold transition-all shadow-[0_0_15px_rgba(20,241,149,0.15)] hover:shadow-[0_0_20px_rgba(20,241,149,0.3)] ml-2 "
+                className="hidden lg:flex items-center gap-1.5 bg-[#14F195] hover:bg-[#10C97A] text-black px-4 py-2 text-xs xl:text-sm font-bold transition-all shadow-[0_0_15px_rgba(20,241,149,0.15)] hover:shadow-[0_0_20px_rgba(20,241,149,0.3)] rounded-md ml-2"
               >
                 dashboard
               </Link>
@@ -177,19 +193,19 @@ export default function Navbar() {
           </div>
         </div>
 
+        {/* Mobile Menu (unchanged from previous) */}
         {mobileMenuOpen && (
           <div className="lg:hidden fixed inset-x-0 top-14 bottom-0 bg-[#FFFFFF] dark:bg-[#0C0C0C] border-b border-zinc-200 dark:border-[#222] overflow-y-auto px-4 py-6 z-50 flex flex-col justify-between">
             <div className="space-y-3">
-
               <Link
                 href="/dashboard"
-                className="flex items-center justify-between p-3.5 bg-[#14F195] text-black font-bold hover:bg-[#10C97A] transition-colors shadow-[0_0_15px_rgba(20,241,149,0.15)] rounded-sm"
+                className="flex items-center justify-between p-3.5 bg-[#14F195] text-black font-bold hover:bg-[#10C97A] transition-colors shadow-[0_0_15px_rgba(20,241,149,0.15)] rounded-lg"
               >
                 <span>launch dashboard</span>
                 <ArrowUpRight size={16} />
               </Link>
 
-              <div className="border border-zinc-200 dark:border-[#222]">
+              <div className="border border-zinc-200 dark:border-[#222] rounded-lg overflow-hidden">
                 <button onClick={() => toggleSection("docs")} className="w-full flex items-center justify-between p-3.5 text-left font-medium text-black dark:text-white hover:bg-zinc-50 dark:hover:bg-[#141414] transition-colors">
                   <span>docs</span>
                   <ChevronDown size={16} className={`transition-transform duration-200 ${expandedSection === "docs" ? "rotate-180" : ""}`} />
@@ -197,7 +213,7 @@ export default function Navbar() {
                 {expandedSection === "docs" && (
                   <div className="p-2 border-t border-zinc-200 dark:border-[#222] bg-zinc-50/50 dark:bg-[#111] grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {DOCS_ITEMS.map((item) => (
-                      <Link key={item.title} href={item.href} target={item.external ? "_blank" : undefined} className="p-2.5 bg-white dark:bg-[#0C0C0C] border border-zinc-200 dark:border-[#222] hover:border-black dark:hover:border-white transition-all flex flex-col justify-between">
+                      <Link key={item.title} href={item.href} target={item.external ? "_blank" : undefined} className="p-2.5 rounded-md bg-white dark:bg-[#0C0C0C] border border-zinc-200 dark:border-[#222] hover:border-black dark:hover:border-white transition-all flex flex-col justify-between">
                         <div className="flex items-center justify-between font-medium text-black dark:text-white text-xs mb-1">
                           <span>{item.title}</span>
                           <ArrowUpRight size={12} className="text-zinc-400" />
@@ -209,7 +225,7 @@ export default function Navbar() {
                 )}
               </div>
 
-              <div className="border border-zinc-200 dark:border-[#222]">
+              <div className="border border-zinc-200 dark:border-[#222] rounded-lg overflow-hidden">
                 <button onClick={() => toggleSection("cli")} className="w-full flex items-center justify-between p-3.5 text-left font-medium text-black dark:text-white hover:bg-zinc-50 dark:hover:bg-[#141414] transition-colors">
                   <span>cli</span>
                   <ChevronDown size={16} className={`transition-transform duration-200 ${expandedSection === "cli" ? "rotate-180" : ""}`} />
@@ -217,7 +233,7 @@ export default function Navbar() {
                 {expandedSection === "cli" && (
                   <div className="p-2 border-t border-zinc-200 dark:border-[#222] bg-zinc-50/50 dark:bg-[#111] grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {CLI_ITEMS.map((item) => (
-                      <Link key={item.title} href={item.href} target={item.external ? "_blank" : undefined} className="p-2.5 bg-white dark:bg-[#0C0C0C] border border-zinc-200 dark:border-[#222] hover:border-black dark:hover:border-white transition-all flex flex-col justify-between">
+                      <Link key={item.title} href={item.href} target={item.external ? "_blank" : undefined} className="p-2.5 rounded-md bg-white dark:bg-[#0C0C0C] border border-zinc-200 dark:border-[#222] hover:border-black dark:hover:border-white transition-all flex flex-col justify-between">
                         <div className="flex items-center justify-between font-medium text-black dark:text-white text-xs mb-1">
                           <span>{item.title}</span>
                           <ArrowUpRight size={12} className="text-zinc-400" />
@@ -229,7 +245,7 @@ export default function Navbar() {
                 )}
               </div>
 
-              <div className="border border-zinc-200 dark:border-[#222]">
+              <div className="border border-zinc-200 dark:border-[#222] rounded-lg overflow-hidden">
                 <button onClick={() => toggleSection("proofs")} className="w-full flex items-center justify-between p-3.5 text-left font-medium text-black dark:text-white hover:bg-zinc-50 dark:hover:bg-[#141414] transition-colors">
                   <span>proofs</span>
                   <ChevronDown size={16} className={`transition-transform duration-200 ${expandedSection === "proofs" ? "rotate-180" : ""}`} />
@@ -237,7 +253,7 @@ export default function Navbar() {
                 {expandedSection === "proofs" && (
                   <div className="p-2 border-t border-zinc-200 dark:border-[#222] bg-zinc-50/50 dark:bg-[#111] grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {PROOFS_ITEMS.map((item) => (
-                      <Link key={item.title} href={item.href} className="p-2.5 bg-white dark:bg-[#0C0C0C] border border-zinc-200 dark:border-[#222] hover:border-black dark:hover:border-white transition-all flex flex-col justify-between">
+                      <Link key={item.title} href={item.href} className="p-2.5 rounded-md bg-white dark:bg-[#0C0C0C] border border-zinc-200 dark:border-[#222] hover:border-black dark:hover:border-white transition-all flex flex-col justify-between">
                         <div className="flex items-center justify-between font-medium text-black dark:text-white text-xs mb-1">
                           <span>{item.title}</span>
                           <ArrowUpRight size={12} className="text-zinc-400" />
@@ -249,13 +265,12 @@ export default function Navbar() {
                 )}
               </div>
 
-              <button onClick={() => setFaqOpen(true)} className="w-full flex items-center justify-between p-3.5 border border-zinc-200 dark:border-[#222] font-medium text-black dark:text-white hover:bg-zinc-50 dark:hover:bg-[#141414] transition-colors text-left">
+              <button onClick={() => setFaqOpen(true)} className="w-full flex items-center justify-between p-3.5 rounded-lg border border-zinc-200 dark:border-[#222] font-medium text-black dark:text-white hover:bg-zinc-50 dark:hover:bg-[#141414] transition-colors text-left">
                 <span>faq</span>
                 <HelpCircle size={16} className="text-zinc-500" />
               </button>
             </div>
 
-            {/* todo: check name before pusing it */}
             <div className="mt-8 pt-4 border-t border-zinc-200 dark:border-[#222] text-xs text-zinc-500 flex items-center justify-between">
               <span>shugo / 守護 / शुगो</span>
               <Link href="https://github.com/Shugo-protocol/Shugo" target="_blank" className="hover:text-black dark:hover:text-white transition-colors">
@@ -278,7 +293,7 @@ export default function Navbar() {
           <div className="flex flex-col font-mono lowercase">
             {FAQ_DATA.map((faq, index) => <FaqAccordion key={index} q={faq.q} a={faq.a} />)}
           </div>
-          <div className="mt-12 p-4 bg-zinc-100 dark:bg-[#141414] border border-zinc-200 dark:border-[#222] text-xs text-zinc-500 dark:text-zinc-400 font-mono lowercase">
+          <div className="mt-12 p-4 rounded-lg bg-zinc-100 dark:bg-[#141414] border border-zinc-200 dark:border-[#222] text-xs text-zinc-500 dark:text-zinc-400 font-mono lowercase">
             <span className="font-bold text-black dark:text-white">note:</span> explicitly architected for solana foundation's s&a delegation standards.
           </div>
         </div>

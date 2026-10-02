@@ -1,0 +1,85 @@
+---
+title: "Copy for AI (LLM Context)"
+description: "Copy Shugo's core context to paste into Claude, ChatGPT, or Cursor."
+---
+
+If you are building an agent and want to use an LLM (like Claude, OpenAI, or Cursor) to write your integration code, copy the context blocks below. 
+
+They contain the full Shugo SDK reference and architecture rules formatted specifically for the AI you are using.
+
+<CodeGroup>
+
+```text Claude (XML)
+<shugo_context>
+  <description>
+    Shugo is a zero-custody policy delegation protocol on Solana. 
+    It prevents autonomous AI agents from having direct access to treasury private keys.
+  </description>
+  <architecture>
+    1. Treasury Authority (Human): Owns the funds.
+    2. Shugo Subscription Authority (PDA): The SPL Token Delegate enforcing rules.
+    3. Agent Operator (AI): Signs transactions using an ephemeral key.
+  </architecture>
+  <rules>
+    - Never give the agent the treasury private key.
+    - Always use UNKNOWN_INIT_ID (i64::MIN) when creating a same-slot allowance.
+    - Agents must execute via `session.executeGuardedTransfer()`.
+  </rules>
+  <sdk_example>
+    import { ShugoClient, UNKNOWN_INIT_ID } from "@shugo-protocol/sdk";
+    // Setup allowance
+    const { txSignature, subscriptionAuthorityPda } = await shugo.createAllowance({
+      mint,
+      owner: treasuryOwner.publicKey,
+      agentDelegate: agentPublicKey,
+      velocityCapAmount: 100_000_000n, // 100 USDC
+      windowSlots: 216_000n, // ~24 hours
+      initId: UNKNOWN_INIT_ID,
+    });
+  </sdk_example>
+</shugo_context>
+
+You are an expert Solana smart contract developer integrating the Shugo protocol. 
+Shugo is a zero-custody guardrail system for AI agents. 
+
+CRITICAL RULES:
+1. The AI Agent NEVER holds the private key to the treasury. 
+2. The agent only holds an ephemeral key that signs `executeGuardedTransfer` calls.
+3. When initializing a Shugo allowance, always pass `initId: UNKNOWN_INIT_ID` to prevent slot racing.
+4. Velocity caps are measured in slots (216,000 slots ≈ 24 hours).
+
+CODE PATTERN:
+const shugo = new ShugoClient(connection, treasuryOwner);
+await shugo.createAllowance({
+  mint: mintPubkey,
+  owner: treasuryPubkey,
+  agentDelegate: agentPubkey,
+  velocityCapAmount: 100_000_000n,
+  windowSlots: 216_000n,
+  initId: UNKNOWN_INIT_ID,
+});
+
+# Shugo Developer Context
+
+**Overview:** Shugo is an on-chain guardrail for AI agents on Solana. It separates custody from execution authority.
+
+**Key Concepts:**
+- **Zero-Custody:** Agents sign with ephemeral keys.
+- **Velocity Caps:** Max spend limits enforced on-chain per slot window.
+- **UNKNOWN_INIT_ID:** Sentinel value (i64::MIN) used to prevent slot race conditions during initialization.
+
+**Integration Example:**
+```typescript
+import { ShugoClient, UNKNOWN_INIT_ID } from "@shugo-protocol/sdk";
+
+const shugo = new ShugoClient(connection, treasuryOwner);
+await shugo.createAllowance({
+  mint,
+  owner: treasuryOwner.publicKey,
+  agentDelegate: agentPublicKey,
+  velocityCapAmount: 100_000_000n,
+  windowSlots: 216_000n,
+  initId: UNKNOWN_INIT_ID,
+});
+
+</CodeGroup>

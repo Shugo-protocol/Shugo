@@ -1,0 +1,120 @@
+---
+title: "Quickstart"
+description: "Deploy an agent allowance and execute your first policy-guarded transfer in under 5 minutes."
+---
+
+import { Steps, Step, Tabs, Tab, Note, Warning } from '@mintlify/components';
+
+This guide walks you through setting up a Shugo allowance for an agent, configuring a velocity limit, and executing a bounded transfer via the TypeScript SDK.
+
+## Prerequisites
+
+- Node.js v18+ or Bun
+- A Solana keypair with Devnet or Mainnet-beta SOL
+- A SPL Token or Token-2022 mint address (e.g., USDC)
+
+<Steps>
+  <Step title="Install the SDK">
+    Install `@shugo-protocol/sdk` alongside `@solana/web3.js` and `@solana/spl-token`:
+
+    <Tabs>
+      <Tab title="npm">
+        ```bash
+        npm install @shugo-protocol/sdk @solana/web3.js @solana/spl-token
+        ```
+      </Tab>
+      <Tab title="pnpm">
+        ```bash
+        pnpm add @shugo-protocol/sdk @solana/web3.js @solana/spl-token
+        ```
+      </Tab>
+      <Tab title="bun">
+        ```bash
+        bun add @shugo-protocol/sdk @solana/web3.js @solana/spl-token
+        ```
+      </Tab>
+    </Tabs>
+  </Step>
+
+  <Step title="Initialize the Subscription Authority">
+    The treasury owner initializes the Shugo Subscription Authority PDA and delegates SPL Token authority over the designated token account.
+
+    ```typescript
+    import { Connection, Keypair, PublicKey } from "@solana/web3.js";
+    import { ShugoClient, UNKNOWN_INIT_ID } from "@shugo-protocol/sdk";
+
+    const connection = new Connection("[https://api.devnet.solana.com](https://api.devnet.solana.com)", "confirmed");
+    const treasuryOwner = Keypair.fromSecretKey(/* ... */);
+    const agentPublicKey = new PublicKey("Agnt..."); // Ephemeral Agent Signer
+    const mint = new PublicKey("4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU"); // Devnet USDC
+
+    const shugo = new ShugoClient(connection, treasuryOwner);
+
+    // Create the delegation policy: Max 100 USDC per 216,000 slots (~24 hours)
+    const { txSignature, subscriptionAuthorityPda } = await shugo.createAllowance({
+      mint,
+      owner: treasuryOwner.publicKey,
+      agentDelegate: agentPublicKey,
+      velocityCapAmount: 100_000_000n, // 100 USDC (6 decimals)
+      windowSlots: 216_000n,           // ~24 hours on Solana mainnet
+      initId: UNKNOWN_INIT_ID,         // Sentinel for atomic same-slot initialization
+    });
+
+    console.log(`Shugo Authority configured at: ${subscriptionAuthorityPda.toBase58()}`);
+    console.log(`Transaction confirmed: ${txSignature}`);
+    ```
+
+    <Note>
+      `UNKNOWN_INIT_ID` (`i64::MIN`) allows the client to atomically construct and sign the policy creation without having to pre-fetch the current slot, preventing slot skew race conditions.
+    </Note>
+  </Step>
+
+  <Step title="Execute Agent Transfer within Limits">
+    Now authenticate as the **Agent** using its low-security keypair. The agent can transfer funds directly from the treasury's ATA to any approved vendor or recipient within its velocity cap.
+
+    ```typescript
+    import { Connection, Keypair, PublicKey } from "@solana/web3.js";
+    import { ShugoAgentSession } from "@shugo-protocol/sdk";
+
+    const connection = new Connection("[https://api.devnet.solana.com](https://api.devnet.solana.com)", "confirmed");
+    const agentKeypair = Keypair.fromSecretKey(/* agent operational key */);
+    const treasuryOwnerPubkey = new PublicKey("Trz...");
+    const recipientPubkey = new PublicKey("Vend...");
+    const mint = new PublicKey("4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU");
+
+    const session = new ShugoAgentSession(connection, agentKeypair);
+
+    // Move 15 USDC for an API query
+    const tx = await session.executeGuardedTransfer({
+      treasuryOwner: treasuryOwnerPubkey,
+      mint,
+      recipient: recipientPubkey,
+      amount: 15_000_000n,
+    });
+
+    console.log(`Transfer executed by agent: ${tx}`);
+    ```
+  </Step>
+
+  <Step title="Test the Velocity Guardrail">
+    If the agent attempts to move more than the remaining allocated limit or breaches policy, the transaction is rejected **on-chain** before state mutation occurs.
+
+    ```typescript
+    try {
+      await session.executeGuardedTransfer({
+        treasuryOwner: treasuryOwnerPubkey,
+        mint,
+        recipient: recipientPubkey,
+        amount: 200_000_000n, // Exceeds the 100 USDC velocity cap
+      });
+    } catch (err: any) {
+      // Expected Error: SubscriptionsError::VelocityCapExceeded (0x1774)
+      console.error("Guarded by Shugo:", err.message);
+    }
+    ```
+
+    <Warning>
+      Rejection happens at the runtime CPI layer: compute units are consumed minimally, and zero treasury tokens are debited.
+    </Warning>
+  </Step>
+</Steps>

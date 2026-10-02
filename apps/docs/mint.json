@@ -1,20 +1,19 @@
 {
   "$schema": "https://mintlify.com/schema.json",
-  "name": "shugo / 守護",
+  "name": "Shugo / 守護",
   "logo": {
-    "dark": "https://mintlify.s3-us-west-1.amazonaws.com/mintlify/logo-dark.svg",
-    "light": "https://mintlify.s3-us-west-1.amazonaws.com/mintlify/logo-light.svg"
+    "dark": "/logo-dark.svg",
+    "light": "/logo-light.svg"
   },
   "favicon": "/favicon.svg",
   "colors": {
-    "primary": "#0C0C0C",
-    "light": "#FAFAFA",
-    "dark": "#111111",
-    "anchors": "#14F195"
+    "primary": "#8a8a8a",
+    "light": "#ffffff",
+    "dark": "#0a0a0a"
   },
   "topbarCtaButton": {
-    "name": "back to shugo",
-    "url": "https://shugo.com"
+    "name": "App & Playground",
+    "url": "https://shugo.network"
   },
   "topbarLinks": [
     {
@@ -24,22 +23,24 @@
   ],
   "navigation": [
     {
-      "group": "getting started",
+      "group": "Getting Started",
       "pages": [
         "introduction",
         "quickstart"
       ]
     },
     {
-      "group": "architecture",
+      "group": "Architecture",
       "pages": [
         "zero-custody",
         "velocity-caps"
       ]
+    },
+    {
+      "group": "Developer Resources",
+      "pages": [
+        "copy-for-ai"
+      ]
     }
-  ],
-  "footerSocials": {
-    "x": "https://x.com",
-    "github": "https://github.com/shugo-protocol/shugo"
-  }
+  ]
 }

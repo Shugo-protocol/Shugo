@@ -1,0 +1,224 @@
+---
+title: "Zero-Custody Architecture"
+description: "How Shugo isolates signing authority from asset holding using delegated SPL PDAs."
+---
+
+import { Card, CardGroup, Note, Warning } from '@mintlify/components';
+
+## The Threat Model
+
+When designing autonomous software operating with cryptographic assets, standard assumptions about key custody fail:
+
+1. **Prompt Injection:** An adversary manipulates an LLM agent into executing arbitrary transaction instructions.
+2. **Logic Errors & Hallucinations:** An automated rebalancer computes an erroneous swap input or transfers funds to an invalid address.
+3. **Dependency Poisoning:** An exploit inside an agent framework (e.g., LangChain or Eliza plugin) leaks secrets stored in memory.
+
+In a naive architecture, the agent directly controls the wallet `Private Key (sk)`. A compromised key means complete protocol drain.
+
+## Cryptographic Separation via SPL Delegation
+
+Shugo implements zero-custody by splitting **ownership** from **execution allowance**.
+
+```text
+┌─────────────────────────────────────────────────────────────┐
+│                     Treasury Owner                          │
+│          (Hardware Wallet, Multisig, or Cold Key)           │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              │ 1. Approve SPL Delegate Authority
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│              Shugo Subscription Authority                   │
+│                (Deterministic Program PDA)                  │
+│                                                             │
+│  State Tracking:                                            │
+│  • init_id: i64                                             │
+│  • current_window_start: u64                                │
+│  • amount_spent_in_window: u64                              │
+│  • velocity_cap: u64                                        │
+└─────────────────────────────────────────────────────────────┘
+                              ▲
+                              │ 2. Agent Invokes Guarded CPI
+                              │
+┌─────────────────────────────────────────────────────────────┐
+│                    Autonomous Agent                         │
+│             (Low-security operational signer)               │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 1. Root PDA as SPL Token Delegate
+
+Instead of delegating to another arbitrary wallet, the treasury executes `ApproveChecked`, designating a derived Shugo Program Derived Address (PDA) as the delegate:
+
+$$
+\text{PDA} =
+\text{findProgramAddress}
+([\text{"subscription\_authority"}, \text{owner}, \text{mint}],
+\text{PROGRAM\_ID})
+$$
+
+Because this account is a PDA owned by the Shugo program, **only code that satisfies the Shugo on-chain state machine can invoke token transfers via CPI**.
+
+### 2. The `UNKNOWN_INIT_ID` Anti-Race Sentinel
+
+A recurrent issue in Solana atomic transaction composition is race conditions around slot numbers. When deploying a multi-instruction transaction (creation + first transfer), the client cannot guarantee which slot the block builder will land the transaction in.
+
+Shugo solves this with the sentinel constant:
+
+```rust
+pub const UNKNOWN_INIT_ID: i64 = i64::MIN;
+```
+
+Inside `subscription_authority.rs`:
+
+```rust
+pub fn check_init_id(&self, expected_init_id: i64) -> Result<(), ProgramError> {
+    let expected = if expected_init_id == UNKNOWN_INIT_ID {
+        Clock::get()?.slot as i64
+    } else {
+        expected_init_id
+    };
+
+    if self.init_id != expected {
+        return Err(
+            SubscriptionsError::StaleSubscriptionAuthority.into()
+        );
+    }
+
+    Ok(())
+}
+```
+
+**Same-slot 1-step signup:**  
+If `expected_init_id == UNKNOWN_INIT_ID`, the program sets `init_id = Clock::slot`.
+
+**Subsequent operations:**  
+The SDK supplies the concrete `init_id`, guaranteeing protection against reorgs, replay attacks, or stale authority reuse.
+
+## Emergency Revocation
+
+The treasury owner can revoke Shugo's authority at any time in a single standard transaction using the native SPL Token `Revoke` instruction.
+
+This bypasses the Shugo program completely, instantly freezing all agent execution permissions on the token account.
+
+
+---
+title: "Velocity Caps & Limits"
+description: "Deterministic epoch and slot-based budget bounding, verified with AWS Kani."
+---
+
+import { Card, CardGroup, Note, Warning } from '@mintlify/components';
+
+## Window Mechanics
+
+Shugo implements rolling discrete slot windows:
+
+| Parameter | Type | Description |
+|:---|:---|:---|
+| `velocity_cap` | `u64` | Maximum micro-tokens permitted per window |
+| `window_slots` | `u64` | Window length in Solana slots (approx. 400ms / slot) |
+| `window_start_slot` | `u64` | Slot where the active budget window commenced |
+| `spent_in_window` | `u64` | Cumulative volume consumed in the current window |
+
+### State Transition Logic
+
+When an agent requests a debit of `amount`:
+
+```text
+Current Slot = Clock::get()?.slot
+        │
+        ▼
+Is (Current Slot - window_start_slot) >= window_slots?
+        │
+   ┌────┴────┐
+  YES        NO
+   │          │
+   ▼          ▼
+Reset       Maintain
+Window      Current Window
+   │          │
+   │          │
+   ├──────────┘
+   ▼
+Check:
+(spent_in_window + amount) <= velocity_cap?
+        │
+   ┌────┴────┐
+  YES        NO
+   │          │
+   ▼          ▼
+spent_in_    FAIL:
+window +=    SubscriptionsError::
+amount       VelocityCapExceeded
+   │
+   ▼
+EXECUTE SPL CPI TRANSFER
+```
+
+## Formal Verification with AWS Kani
+
+To guarantee that overflow bugs, integer truncation, and edge-case clock resets cannot bypass constraints, Shugo's balance math and window rolling logic are formally verified using **AWS Kani Model Checker**.
+
+### Mathematical Invariants Proven
+
+<CardGroup cols={2}>
+  <Card title="Invariant 1: Strictly Bounded Loss" icon="shield-halved">
+    For any sequence of slots $S$ and transfer amounts $A$, total debits over any interval of length $W$ will never exceed `velocity_cap`.
+  </Card>
+
+  <Card title="Invariant 2: Overflow Immunity" icon="binary">
+    `spent_in_window + amount` is strictly checked against arithmetic overflow under all possible arbitrary 64-bit inputs.
+  </Card>
+
+  <Card title="Invariant 3: Sentinel Collision Freedom" icon="fingerprint">
+    `UNKNOWN_INIT_ID` ($i64::\text{MIN}$) is mathematically proven to never collide with any legitimate positive `Clock::slot`.
+  </Card>
+
+  <Card title="Invariant 4: Stale Authority Protection" icon="clock">
+    Out-of-order execution or replayed payloads fail deterministically when tested against historical slots.
+  </Card>
+</CardGroup>
+
+### Excerpt of Verification Harness
+
+```rust
+#[cfg(kani)]
+#[kani::proof]
+fn verify_velocity_cap_enforcement() {
+    let cap: u64 = kani::any();
+    let current_spent: u64 = kani::any();
+    let requested_amount: u64 = kani::any();
+
+    kani::assume(current_spent <= cap);
+
+    let result = check_and_accumulate_spending(
+        current_spent,
+        requested_amount,
+        cap,
+    );
+
+    match result {
+        Ok(new_spent) => {
+            // Guarantee: New spent never exceeds cap
+            kani::assert(new_spent <= cap);
+
+            // Guarantee: New spent strictly increases
+            // by the requested amount
+            kani::assert(
+                new_spent == current_spent + requested_amount
+            );
+        }
+
+        Err(_) => {
+            // Guarantee: If it failed, it must be due to
+            // exceeding the cap or arithmetic overflow
+            kani::assert(
+                current_spent
+                    .checked_add(requested_amount)
+                    .is_none()
+                    || current_spent + requested_amount > cap
+            );
+        }
+    }
+}
+``` 
