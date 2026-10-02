@@ -53,78 +53,74 @@ function IncomingMessage({ onOpenArch }: { onOpenArch: () => void }) {
   const audioCtxRef = useRef<AudioContext | null>(null);
 
   useEffect(() => {
-    // 1. Initialize Audio Context
-    try {
-      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-      if (AudioContextClass && !audioCtxRef.current) {
-        audioCtxRef.current = new AudioContextClass();
-      }
-    } catch (e) {}
-
-    // 2. Aggressive Audio Unlocker
-    // Browsers block autoplay. This immediately unlocks the audio context 
-    // the millisecond the user moves their mouse, scrolls, or presses a key.
-    const unlockAudio = async () => {
-      if (audioCtxRef.current && audioCtxRef.current.state === 'suspended') {
+    const playSound = (type: 'impact' | 'open') => {
+      if (type === 'impact') {
         try {
-          await audioCtxRef.current.resume();
-        } catch(e) {}
-      }
-      // Clean up listeners once unlocked
-      ['click', 'touchstart', 'keydown', 'mousemove', 'scroll'].forEach(evt =>
-        window.removeEventListener(evt, unlockAudio)
-      );
-    };
-
-    ['click', 'touchstart', 'keydown', 'mousemove', 'scroll'].forEach(evt =>
-      window.addEventListener(evt, unlockAudio, { once: true, passive: true })
-    );
-
-    const playSound = async (type: 'impact' | 'open') => {
-      try {
-        const ctx = audioCtxRef.current;
-        if (!ctx) return;
-        
-        if (ctx.state === 'suspended') await ctx.resume();
-        
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        
-        if (type === 'impact') {
+          // 1. Initialize Context only when needed for the synthesized bounce
+          if (!audioCtxRef.current) {
+            const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+            if (!AudioContextClass) return;
+            audioCtxRef.current = new AudioContextClass();
+          }
+          
+          const ctx = audioCtxRef.current;
+          
+          // 2. Try to resume if the browser suspended it
+          if (ctx.state === 'suspended') {
+            ctx.resume().catch(() => {});
+          }
+          
+          // 3. If it is STILL not running, abort to prevent queued sounds exploding later
+          if (ctx.state !== 'running') {
+            return;
+          }
+          
+          // 4. Play the synthesized "thud/bounce"
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          
+          const now = ctx.currentTime;
+          
           osc.type = 'sine';
-          osc.frequency.setValueAtTime(120, ctx.currentTime);
-          osc.frequency.exponentialRampToValueAtTime(30, ctx.currentTime + 0.1);
-          gain.gain.setValueAtTime(0, ctx.currentTime);
-          gain.gain.linearRampToValueAtTime(0.8, ctx.currentTime + 0.02);
-          gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
-          osc.start(ctx.currentTime);
-          osc.stop(ctx.currentTime + 0.15);
-        } else {
-          osc.type = 'triangle';
-          osc.frequency.setValueAtTime(880, ctx.currentTime);
-          osc.frequency.exponentialRampToValueAtTime(1760, ctx.currentTime + 0.1);
-          gain.gain.setValueAtTime(0, ctx.currentTime);
-          gain.gain.linearRampToValueAtTime(0.3, ctx.currentTime + 0.02);
-          gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
-          osc.start(ctx.currentTime);
-          osc.stop(ctx.currentTime + 0.3);
+          osc.frequency.setValueAtTime(150, now);
+          osc.frequency.exponentialRampToValueAtTime(40, now + 0.1);
+          gain.gain.setValueAtTime(0, now);
+          gain.gain.linearRampToValueAtTime(0.6, now + 0.02);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+          osc.start(now);
+          osc.stop(now + 0.15);
+        } catch (e) {
+          console.warn("Autoplay blocked synthesized impact sound.");
         }
-      } catch (e) {
-        console.warn("Autoplay blocked by browser policy.");
+      } else if (type === 'open') {
+        try {
+          // Play the user's custom MP3 file for the message opening
+          const audio = new Audio('/sound.mp3');
+          audio.volume = 0.6;
+          
+          // Catch and silently fail if the browser blocks the mp3 autoplay
+          audio.play().catch(() => {
+            console.warn("Autoplay blocked MP3 message sound.");
+          });
+        } catch (e) {
+          console.error("Audio playback error:", e);
+        }
       }
     };
 
-    // Stretched animation timings to 2.5s total duration for maximum smoothness
+    // 1. Start the falling animation
     const t1 = setTimeout(() => setStage('falling'), 150);
-    // 40% of 2500ms = 1000ms + 150ms buffer = 1150ms for impact
-    const t2 = setTimeout(() => playSound('impact'), 1150); 
-    // 100% of 2500ms = 2500ms + 150ms buffer = 2650ms for expansion
+    
+    // 2. Play the synthesized bounce EXACTLY at the moment of impact (45% of 2.5s = 1125ms)
+    const t2 = setTimeout(() => playSound('impact'), 150 + 1125); 
+
+    // 3. Expand the message and play the MP3 exactly at the end (100% of 2.5s = 2500ms)
     const t3 = setTimeout(() => {
       setStage('expanded');
       playSound('open');
-    }, 2650);
+    }, 150 + 2500);
 
     return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
   }, []);
@@ -134,20 +130,24 @@ function IncomingMessage({ onOpenArch }: { onOpenArch: () => void }) {
       <style dangerouslySetInnerHTML={{__html: `
         @keyframes dropImpactBounce {
           0% {
-            transform: translate(-25vw, -60vh) rotate(-720deg) scale(0.4);
+            /* Drops from Top-Left on an angle */
+            transform: translate(-30vw, -70vh) rotate(-720deg) scale(0.4);
             opacity: 0;
-            animation-timing-function: cubic-bezier(0.33, 0, 0.67, 1); 
+            animation-timing-function: cubic-bezier(0.42, 0, 1, 1); 
           }
-          40% {
-            transform: translate(-20px, 40px) rotate(-15deg) scale3d(1.1, 0.8, 1);
+          45% {
+            /* Hits slightly to the left, squished */
+            transform: translate(-25px, 60px) rotate(-25deg) scale3d(1.3, 0.6, 1);
             opacity: 1;
-            animation-timing-function: cubic-bezier(0.25, 1, 0.5, 1);
+            animation-timing-function: cubic-bezier(0.21, 0.85, 0.33, 1);
           }
-          70% {
-            transform: translate(5px, -10px) rotate(5deg) scale3d(0.98, 1.02, 1);
-            animation-timing-function: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+          75% {
+            /* Rebounds slightly to the right */
+            transform: translate(5px, -15px) rotate(10deg) scale3d(0.95, 1.05, 1);
+            animation-timing-function: cubic-bezier(0.45, 0.05, 0.55, 0.95);
           }
           100% {
+            /* Settles perfectly */
             transform: translate(0, 0) rotate(0deg) scale3d(1, 1, 1);
             opacity: 1;
           }
@@ -252,7 +252,6 @@ export default function Home() {
           </p>
         </Reveal>
 
-        {/* Significantly decreased bottom margin here to close the gap to the video */}
         <Reveal delay="delay-[500ms]" className="z-10 mt-8 mb-6 xl:mb-8">
           <div className="flex flex-col items-center gap-2 text-zinc-500 dark:text-zinc-400 text-sm opacity-80 hover:opacity-100 transition-opacity cursor-pointer">
             <span>see shugo in action</span>

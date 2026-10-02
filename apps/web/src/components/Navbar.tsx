@@ -166,24 +166,20 @@ export default function Navbar() {
           isMounted ? "translate-y-0 opacity-100" : "-translate-y-8 opacity-0"
         }`}
       >
-        {/* Fading blurred background layer */}
         <div className="absolute inset-x-0 top-0 h-28 sm:h-32 bg-white/50 dark:bg-[#0C0C0C]/50 backdrop-blur-xl [mask-image:linear-gradient(to_bottom,black_45%,transparent_100%)] pointer-events-none -z-10" />
 
         <div className="w-full">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
-            
-            {/* Left: Brand Logo & Devnet Badge */}
-            <div className="flex items-center justify-start flex-1 min-w-0">
-              <Link className="font-bold text-base sm:text-xl text-black dark:text-white hover:opacity-75 transition-opacity truncate" href="/">
+          {/* Added 'relative' to the container, removed flex-1 from children */}
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between relative">
+
+            <div className="flex items-center justify-start min-w-0 z-10">
+              <Link className="text-base sm:text-xl font-light text-black dark:text-white hover:opacity-75 transition-opacity truncate" href="/">
                 <ScrambleText text="shugo" japanese="守護" hindi="शुगो" />
               </Link>
-              <span className="ml-2 flex items-center px-1.5 py-0.5 border border-[#14F195]/30 bg-[#14F195]/10 text-[#14F195] text-[10px] sm:text-[11px] leading-none rounded-sm font-semibold shrink-0">
-                devnet
-              </span>
             </div>
 
-            {/* Center: Desktop Navigation */}
-            <nav className="hidden lg:flex items-center justify-center gap-1 xl:gap-2 flex-none">
+            {/* Absolutely centered middle navigation */}
+            <nav className="hidden lg:flex absolute left-1/2 -translate-x-1/2 items-center justify-center gap-1 xl:gap-2 z-10">
               <DesktopDropdown label="docs" mainHref="https://docs.shugo.com" items={DOCS_ITEMS} />
               <DesktopDropdown label="cli" mainHref="https://docs.shugo.com/quickstart" items={CLI_ITEMS} />
               <DesktopDropdown label="proofs" mainHref="/proofs" items={PROOFS_ITEMS} />
@@ -197,8 +193,7 @@ export default function Navbar() {
               </div>
             </nav>
 
-            {/* Right: Actions */}
-            <div className="flex items-center justify-end gap-1.5 sm:gap-2 flex-1">
+            <div className="flex items-center justify-end gap-1.5 sm:gap-2 z-10">
               <div className="hover:bg-zinc-100/80 dark:hover:bg-white/10 rounded-full transition-all p-1 flex items-center justify-center">
                 <ThemeToggle />
               </div>
@@ -219,7 +214,6 @@ export default function Navbar() {
                 dashboard
               </Link>
 
-              {/* Mobile Hamburger Toggle with 44px minimum touch target */}
               <button 
                 onClick={() => setMobileMenuOpen((prev) => !prev)} 
                 aria-label="Toggle navigation menu" 
@@ -231,14 +225,13 @@ export default function Navbar() {
           </div>
         </div>
 
-        {/* Mobile Fullscreen Slide-Down Menu */}
         <div 
           className={`lg:hidden fixed inset-x-0 top-14 h-[calc(100dvh-3.5rem)] bg-white/95 dark:bg-[#0C0C0C]/95 backdrop-blur-2xl border-t border-zinc-200/80 dark:border-[#222] transition-all duration-300 ease-out z-50 flex flex-col justify-between overflow-y-auto px-4 py-5 sm:px-6 ${
             mobileMenuOpen ? "opacity-100 translate-y-0 pointer-events-auto" : "opacity-0 -translate-y-4 pointer-events-none"
           }`}
         >
           <div className="space-y-3">
-            {/* Primary Mobile Launch CTA */}
+
             <Link
               href="/dashboard"
               onClick={() => setMobileMenuOpen(false)}
@@ -248,7 +241,6 @@ export default function Navbar() {
               <ArrowUpRight size={18} />
             </Link>
 
-            {/* Docs Accordion */}
             <div className="border border-zinc-200/80 dark:border-[#222] rounded-xl overflow-hidden bg-zinc-50/50 dark:bg-[#111]/50">
               <button 
                 onClick={() => toggleSection("docs")} 
@@ -284,7 +276,6 @@ export default function Navbar() {
               </div>
             </div>
 
-            {/* CLI Accordion */}
             <div className="border border-zinc-200/80 dark:border-[#222] rounded-xl overflow-hidden bg-zinc-50/50 dark:bg-[#111]/50">
               <button 
                 onClick={() => toggleSection("cli")} 
@@ -320,7 +311,6 @@ export default function Navbar() {
               </div>
             </div>
 
-            {/* Proofs Accordion */}
             <div className="border border-zinc-200/80 dark:border-[#222] rounded-xl overflow-hidden bg-zinc-50/50 dark:bg-[#111]/50">
               <button 
                 onClick={() => toggleSection("proofs")} 
@@ -355,7 +345,7 @@ export default function Navbar() {
               </div>
             </div>
 
-            {/* Mobile FAQ Action Button */}
+  
             <button 
               onClick={() => {
                 setMobileMenuOpen(false);
@@ -368,7 +358,7 @@ export default function Navbar() {
             </button>
           </div>
 
-          {/* Mobile Footer Area with safe-area spacing */}
+
           <div className="mt-8 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] border-t border-zinc-200 dark:border-[#222] text-xs text-zinc-500 flex flex-col sm:flex-row items-center justify-between gap-3">
             <span>shugo / 守護 / शुगो</span>
             <Link 
@@ -383,7 +373,6 @@ export default function Navbar() {
         </div>
       </header>
 
-      {/* Mobile-Optimized FAQ Drawer */}
       <div 
         className={`fixed inset-0 z-[60] transition-opacity duration-300 ${
           faqOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
@@ -395,7 +384,6 @@ export default function Navbar() {
             faqOpen ? "translate-x-0" : "translate-x-full"
           }`}
         >
-          {/* Header */}
           <div className="sticky top-0 bg-[#FAFAFA]/95 dark:bg-[#0C0C0C]/95 backdrop-blur-md px-6 py-4 sm:py-5 border-b border-zinc-200/80 dark:border-[#222] flex items-center justify-between z-10 shrink-0">
             <h2 className="text-lg sm:text-xl font-bold tracking-tight text-black dark:text-white font-mono lowercase">judge faq</h2>
             <button 
@@ -407,7 +395,6 @@ export default function Navbar() {
             </button>
           </div>
 
-          {/* Scrollable Questions Content */}
           <div className="flex-1 overflow-y-auto px-6 py-4 flex flex-col font-mono lowercase">
             {FAQ_DATA.map((faq, index) => <FaqAccordion key={index} q={faq.q} a={faq.a} />)}
             
