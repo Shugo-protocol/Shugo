@@ -53,12 +53,32 @@ function IncomingMessage({ onOpenArch }: { onOpenArch: () => void }) {
   const audioCtxRef = useRef<AudioContext | null>(null);
 
   useEffect(() => {
+    // 1. Initialize Audio Context
     try {
       const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
       if (AudioContextClass && !audioCtxRef.current) {
         audioCtxRef.current = new AudioContextClass();
       }
     } catch (e) {}
+
+    // 2. Aggressive Audio Unlocker
+    // Browsers block autoplay. This immediately unlocks the audio context 
+    // the millisecond the user moves their mouse, scrolls, or presses a key.
+    const unlockAudio = async () => {
+      if (audioCtxRef.current && audioCtxRef.current.state === 'suspended') {
+        try {
+          await audioCtxRef.current.resume();
+        } catch(e) {}
+      }
+      // Clean up listeners once unlocked
+      ['click', 'touchstart', 'keydown', 'mousemove', 'scroll'].forEach(evt =>
+        window.removeEventListener(evt, unlockAudio)
+      );
+    };
+
+    ['click', 'touchstart', 'keydown', 'mousemove', 'scroll'].forEach(evt =>
+      window.addEventListener(evt, unlockAudio, { once: true, passive: true })
+    );
 
     const playSound = async (type: 'impact' | 'open') => {
       try {
@@ -96,12 +116,15 @@ function IncomingMessage({ onOpenArch }: { onOpenArch: () => void }) {
       }
     };
 
+    // Stretched animation timings to 2.5s total duration for maximum smoothness
     const t1 = setTimeout(() => setStage('falling'), 150);
-    const t2 = setTimeout(() => playSound('impact'), 150 + 900); 
+    // 40% of 2500ms = 1000ms + 150ms buffer = 1150ms for impact
+    const t2 = setTimeout(() => playSound('impact'), 1150); 
+    // 100% of 2500ms = 2500ms + 150ms buffer = 2650ms for expansion
     const t3 = setTimeout(() => {
       setStage('expanded');
       playSound('open');
-    }, 150 + 2000);
+    }, 2650);
 
     return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
   }, []);
@@ -111,25 +134,25 @@ function IncomingMessage({ onOpenArch }: { onOpenArch: () => void }) {
       <style dangerouslySetInnerHTML={{__html: `
         @keyframes dropImpactBounce {
           0% {
-            transform: translate(-30vw, -70vh) rotate(-720deg) scale(0.4);
+            transform: translate(-25vw, -60vh) rotate(-720deg) scale(0.4);
             opacity: 0;
-            animation-timing-function: cubic-bezier(0.42, 0, 1, 1); 
+            animation-timing-function: cubic-bezier(0.33, 0, 0.67, 1); 
           }
-          45% {
-            transform: translate(-25px, 60px) rotate(-25deg) scale3d(1.3, 0.6, 1);
+          40% {
+            transform: translate(-20px, 40px) rotate(-15deg) scale3d(1.1, 0.8, 1);
             opacity: 1;
-            animation-timing-function: cubic-bezier(0.21, 0.85, 0.33, 1);
+            animation-timing-function: cubic-bezier(0.25, 1, 0.5, 1);
           }
-          75% {
-            transform: translate(5px, -15px) rotate(10deg) scale3d(0.95, 1.05, 1);
-            animation-timing-function: cubic-bezier(0.45, 0.05, 0.55, 0.95);
+          70% {
+            transform: translate(5px, -10px) rotate(5deg) scale3d(0.98, 1.02, 1);
+            animation-timing-function: cubic-bezier(0.25, 0.46, 0.45, 0.94);
           }
           100% {
             transform: translate(0, 0) rotate(0deg) scale3d(1, 1, 1);
             opacity: 1;
           }
         }
-        .animate-fly-bounce { animation: dropImpactBounce 2s forwards; }
+        .animate-fly-bounce { animation: dropImpactBounce 2.5s forwards; }
       `}} />
 
       <button 
@@ -229,7 +252,8 @@ export default function Home() {
           </p>
         </Reveal>
 
-        <Reveal delay="delay-[500ms]" className="z-10 mt-8 mb-16 xl:mb-24">
+        {/* Significantly decreased bottom margin here to close the gap to the video */}
+        <Reveal delay="delay-[500ms]" className="z-10 mt-8 mb-6 xl:mb-8">
           <div className="flex flex-col items-center gap-2 text-zinc-500 dark:text-zinc-400 text-sm opacity-80 hover:opacity-100 transition-opacity cursor-pointer">
             <span>see shugo in action</span>
             <ChevronDown size={16} className="mt-1 text-zinc-400 dark:text-zinc-600 animate-bounce" />
