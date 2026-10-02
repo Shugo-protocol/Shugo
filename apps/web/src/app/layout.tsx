@@ -14,8 +14,9 @@ export const metadata: Metadata = {
   title: "Shugo",
   description: "on-chain guardian for the agentic economy",
   icons: {
-    // Fixed capitalization to match the file system: Shugo.png
-    icon: "/Shugo.png"
+    icon: [
+      { url: '/Shugo.png', href: '/Shugo.png' }
+    ]
   }
 };
 
