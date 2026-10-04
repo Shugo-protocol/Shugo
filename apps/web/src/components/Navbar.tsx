@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ArrowUpRight, ChevronDown, Menu, X, HelpCircle } from "lucide-react";
@@ -95,7 +95,6 @@ function DesktopDropdown({
   mainHref: string;
   onMouseEnter: (e: React.MouseEvent<HTMLDivElement>) => void;
 }) {
-  // Inner sliding pill animation for dropdown items
   const [pillStyle, setPillStyle] = useState({ transform: 'translate(0px, 0px)', width: 0, height: 0, opacity: 0 });
 
   const handleItemEnter = (e: React.MouseEvent<HTMLAnchorElement>) => {
@@ -127,7 +126,6 @@ function DesktopDropdown({
             className="grid grid-cols-2 gap-2 text-xs relative z-10"
             onMouseLeave={() => setPillStyle(prev => ({ ...prev, opacity: 0 }))}
           >
-            {/* Sliding Background Pill for dropdown items */}
             <div 
               className="absolute top-0 left-0 z-0 rounded-lg bg-zinc-50 dark:bg-[#141414] border border-zinc-200 dark:border-[#222] transition-all duration-300 ease-out pointer-events-none will-change-transform"
               style={{ 
@@ -164,10 +162,18 @@ export default function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [faqOpen, setFaqOpen] = useState(false);
   const [expandedSection, setExpandedSection] = useState<string | null>(null);
+  const [isMounted, setIsMounted] = useState(false);
   const pathname = usePathname();
   
-  // Track left offset and width for GPU-accelerated pill sliding in the main nav
-  const [hoverStyle, setHoverStyle] = useState({ transform: 'translateX(0px)', width: 0, opacity: 0 });
+  // RESTORED: Original state and ref for the gliding background hover pill
+  const [hoveredRect, setHoveredRect] = useState({ left: 0, width: 0, opacity: 0 });
+  const navRef = useRef<HTMLElement>(null);
+
+  // RESTORED: Original entrance animation timeout
+  useEffect(() => {
+    const timer = setTimeout(() => setIsMounted(true), 100);
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     setMobileMenuOpen(false);
@@ -175,7 +181,7 @@ export default function Navbar() {
     setExpandedSection(null);
   }, [pathname]);
 
-  // Clean scroll locking without layout jumps
+  // Clean scroll locking
   useEffect(() => {
     if (mobileMenuOpen || faqOpen) {
       document.body.style.overflow = "hidden";
@@ -190,26 +196,27 @@ export default function Navbar() {
     setExpandedSection((prev) => (prev === section ? null : section));
   };
 
+  // RESTORED: Original getBoundingClientRect calculation
   const handleMouseEnter = (e: React.MouseEvent<HTMLDivElement>) => {
-    const target = e.currentTarget;
-    setHoverStyle({
-      transform: `translateX(${target.offsetLeft}px)`,
-      width: target.offsetWidth,
+    if (!navRef.current) return;
+    const navRect = navRef.current.getBoundingClientRect();
+    const targetRect = e.currentTarget.getBoundingClientRect();
+    
+    setHoveredRect({
+      left: targetRect.left - navRect.left,
+      width: targetRect.width,
       opacity: 1
     });
   };
 
   return (
     <>
-      <style dangerouslySetInnerHTML={{__html: `
-        @keyframes navSlideDown {
-          from { transform: translateY(-2rem); opacity: 0; }
-          to { transform: translateY(0); opacity: 1; }
-        }
-        .animate-nav-enter { animation: navSlideDown 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-      `}} />
-
-      <header className="fixed top-0 left-0 right-0 z-40 font-mono text-sm lowercase bg-transparent animate-nav-enter">
+      {/* RESTORED: Original header classes for the entrance animation */}
+      <header 
+        className={`fixed top-0 left-0 right-0 z-40 font-mono text-sm lowercase bg-transparent transition-all duration-[800ms] ease-out ${
+          isMounted ? "translate-y-0 opacity-100" : "-translate-y-8 opacity-0"
+        }`}
+      >
         <div className="absolute inset-x-0 top-0 h-28 sm:h-32 bg-white/50 dark:bg-[#0C0C0C]/50 backdrop-blur-xl [mask-image:linear-gradient(to_bottom,black_45%,transparent_100%)] pointer-events-none -z-10" />
 
         <div className="w-full">
@@ -221,19 +228,20 @@ export default function Navbar() {
               </Link>
             </div>
 
-            {/* FIXED: Removed the erroneous 'relative' class from the end, restoring exact center positioning */}
+            {/* RESTORED: navRef applied here */}
             <nav 
-              onMouseLeave={() => setHoverStyle(prev => ({ ...prev, opacity: 0 }))}
+              ref={navRef}
+              onMouseLeave={() => setHoveredRect(prev => ({ ...prev, opacity: 0 }))}
               className="hidden lg:flex absolute left-1/2 -translate-x-1/2 items-center justify-center gap-1 xl:gap-2 z-10"
             >
               
-              {/* Sliding Hover Pill (GPU Accelerated) */}
+              {/* RESTORED: Original sliding pill logic based on 'left' property */}
               <div 
-                className="absolute top-1/2 -translate-y-1/2 left-0 h-9 bg-zinc-100/80 dark:bg-white/10 rounded-full transition-all duration-300 ease-out pointer-events-none z-0 will-change-transform"
+                className="absolute top-1/2 -translate-y-1/2 h-9 bg-zinc-100/80 dark:bg-white/10 rounded-full transition-all duration-300 ease-out pointer-events-none z-0"
                 style={{ 
-                  transform: hoverStyle.transform, 
-                  width: `${hoverStyle.width}px`, 
-                  opacity: hoverStyle.opacity 
+                  left: `${hoveredRect.left}px`, 
+                  width: `${hoveredRect.width}px`, 
+                  opacity: hoveredRect.opacity 
                 }}
               />
 
