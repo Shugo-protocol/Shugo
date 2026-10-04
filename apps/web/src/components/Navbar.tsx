@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ArrowUpRight, ChevronDown, Menu, X, HelpCircle } from "lucide-react";
@@ -84,12 +84,25 @@ function FaqAccordion({ q, a }: { q: string; a: string }) {
   );
 }
 
-function DesktopDropdown({ label, items, mainHref }: { label: string; items: MenuOption[]; mainHref: string }) {
+function DesktopDropdown({ 
+  label, 
+  items, 
+  mainHref,
+  onMouseEnter
+}: { 
+  label: string; 
+  items: MenuOption[]; 
+  mainHref: string;
+  onMouseEnter: (e: React.MouseEvent<HTMLDivElement>) => void;
+}) {
   return (
-    <div className="relative group flex items-center h-14">
+    <div 
+      className="relative group flex items-center h-14 z-10"
+      onMouseEnter={onMouseEnter}
+    >
       <Link 
         href={mainHref} 
-        className="text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white hover:bg-zinc-100/80 dark:hover:bg-white/10 rounded-full transition-all duration-200 flex items-center gap-1 px-3.5 py-2 text-xs xl:text-[13px] font-medium"
+        className="text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white rounded-full transition-colors duration-200 flex items-center gap-1 px-3.5 py-2 text-xs xl:text-[13px] font-medium"
       >
         <span>{label}</span>
         <ChevronDown size={12} className="transition-transform duration-300 group-hover:rotate-180 opacity-60 group-hover:opacity-100" />
@@ -124,6 +137,10 @@ export default function Navbar() {
   const [isMounted, setIsMounted] = useState(false);
   const pathname = usePathname();
   
+  // State and ref for the gliding background hover pill
+  const [hoveredRect, setHoveredRect] = useState({ left: 0, width: 0, opacity: 0 });
+  const navRef = useRef<HTMLElement>(null);
+
   useEffect(() => {
     const timer = setTimeout(() => setIsMounted(true), 100);
     return () => clearTimeout(timer);
@@ -159,6 +176,19 @@ export default function Navbar() {
     setExpandedSection((prev) => (prev === section ? null : section));
   };
 
+  // Calculates dimensions to slide the pill behind hovered items
+  const handleMouseEnter = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!navRef.current) return;
+    const navRect = navRef.current.getBoundingClientRect();
+    const targetRect = e.currentTarget.getBoundingClientRect();
+    
+    setHoveredRect({
+      left: targetRect.left - navRect.left,
+      width: targetRect.width,
+      opacity: 1
+    });
+  };
+
   return (
     <>
       <header 
@@ -169,7 +199,6 @@ export default function Navbar() {
         <div className="absolute inset-x-0 top-0 h-28 sm:h-32 bg-white/50 dark:bg-[#0C0C0C]/50 backdrop-blur-xl [mask-image:linear-gradient(to_bottom,black_45%,transparent_100%)] pointer-events-none -z-10" />
 
         <div className="w-full">
-          {/* Added 'relative' to the container, removed flex-1 from children */}
           <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between relative">
 
             <div className="flex items-center justify-start min-w-0 z-10">
@@ -178,19 +207,36 @@ export default function Navbar() {
               </Link>
             </div>
 
-            {/* Absolutely centered middle navigation */}
-            <nav className="hidden lg:flex absolute left-1/2 -translate-x-1/2 items-center justify-center gap-1 xl:gap-2 z-10">
-              <DesktopDropdown label="docs" mainHref="https://docs.shugo.com" items={DOCS_ITEMS} />
-              <DesktopDropdown label="cli" mainHref="https://docs.shugo.com/quickstart" items={CLI_ITEMS} />
-              <DesktopDropdown label="proofs" mainHref="/proofs" items={PROOFS_ITEMS} />
-              <div className="h-14 flex items-center">
+            {/* Nav container acting as reference point for absolute hover pill */}
+            <nav 
+              ref={navRef}
+              onMouseLeave={() => setHoveredRect(prev => ({ ...prev, opacity: 0 }))}
+              className="hidden lg:flex absolute left-1/2 -translate-x-1/2 items-center justify-center gap-1 xl:gap-2 z-10"
+            >
+              
+              {/* Sliding Hover Pill */}
+              <div 
+                className="absolute top-1/2 -translate-y-1/2 h-9 bg-zinc-100/80 dark:bg-white/10 rounded-full transition-all duration-300 ease-out pointer-events-none z-0"
+                style={{ 
+                  left: `${hoveredRect.left}px`, 
+                  width: `${hoveredRect.width}px`, 
+                  opacity: hoveredRect.opacity 
+                }}
+              />
+
+              <DesktopDropdown label="docs" mainHref="https://docs.shugo.com" items={DOCS_ITEMS} onMouseEnter={handleMouseEnter} />
+              <DesktopDropdown label="cli" mainHref="https://docs.shugo.com/quickstart" items={CLI_ITEMS} onMouseEnter={handleMouseEnter} />
+              <DesktopDropdown label="proofs" mainHref="/proofs" items={PROOFS_ITEMS} onMouseEnter={handleMouseEnter} />
+              
+              <div className="h-14 flex items-center z-10" onMouseEnter={handleMouseEnter}>
                 <button 
                   onClick={() => setFaqOpen(true)} 
-                  className="text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white hover:bg-zinc-100/80 dark:hover:bg-white/10 rounded-full transition-all duration-200 text-xs xl:text-[13px] font-medium flex items-center gap-1.5 px-3.5 py-2"
+                  className="text-zinc-600 dark:text-zinc-400 hover:text-black dark:hover:text-white rounded-full transition-colors duration-200 text-xs xl:text-[13px] font-medium flex items-center gap-1.5 px-3.5 py-2"
                 >
                   faq <HelpCircle size={14} className="opacity-70" />
                 </button>
               </div>
+
             </nav>
 
             <div className="flex items-center justify-end gap-1.5 sm:gap-2 z-10">
@@ -358,7 +404,6 @@ export default function Navbar() {
             </button>
           </div>
 
-
           <div className="mt-8 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] border-t border-zinc-200 dark:border-[#222] text-xs text-zinc-500 flex flex-col sm:flex-row items-center justify-between gap-3">
             <span>shugo / 守護 / शुगो</span>
             <Link 
@@ -380,12 +425,12 @@ export default function Navbar() {
       >
         <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setFaqOpen(false)} />
         <div 
-          className={`absolute top-0 right-0 h-[100dvh] w-full sm:w-[500px] md:w-[480px] lg:w-[520px] bg-[#FAFAFA] dark:bg-[#0C0C0C] border-l border-zinc-200 dark:border-[#222] shadow-2xl flex flex-col transform transition-transform duration-300 ease-out ${
+          className={`absolute top-0 right-0 h-[100dvh] w-full sm:w-[50vw] bg-[#FAFAFA] dark:bg-[#0C0C0C] border-l border-zinc-200 dark:border-[#222] shadow-2xl flex flex-col transform transition-transform duration-300 ease-out ${
             faqOpen ? "translate-x-0" : "translate-x-full"
           }`}
         >
           <div className="sticky top-0 bg-[#FAFAFA]/95 dark:bg-[#0C0C0C]/95 backdrop-blur-md px-6 py-4 sm:py-5 border-b border-zinc-200/80 dark:border-[#222] flex items-center justify-between z-10 shrink-0">
-            <h2 className="text-lg sm:text-xl font-bold tracking-tight text-black dark:text-white font-mono lowercase">judge faq</h2>
+            <h2 className="text-lg sm:text-xl font-bold tracking-tight text-black dark:text-white font-mono lowercase">faq&apos;s</h2>
             <button 
               onClick={() => setFaqOpen(false)} 
               className="w-9 h-9 flex items-center justify-center bg-zinc-200 dark:bg-[#1A1A1A] hover:bg-zinc-300 dark:hover:bg-[#222] active:scale-95 rounded-full transition-all text-black dark:text-white"

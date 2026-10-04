@@ -1,5 +1,5 @@
 /**
- * @guard/sdk — a policy guardrail layer for Solana's Subscriptions &
+ * @shugo/sdk — a policy guardrail layer for Solana's Subscriptions &
  * Allowances program. See ARCHITECTURE.md for the full design; the short
  * version: a Policy PDA our program controls is registered as `delegatee`
  * on a real S&A FixedDelegation, so every pull is checked against a
@@ -14,6 +14,7 @@ export {
   MAX_DESTINATIONS,
   SUBSCRIPTIONS_PROGRAM_ID,
   TOKEN_PROGRAM_ID,
+  UNKNOWN_INIT_ID,
 } from "./constants.js";
 
 export {
@@ -24,8 +25,8 @@ export {
   deriveSubscriptionAuthorityAddress,
 } from "./pda.js";
 
-export { activeDestinations, decodePolicy } from "./decode.js";
-export type { PolicyAccount } from "./decode.js";
+export { activeDestinations, decodePolicy, decodeSubscriptionAuthority, SUBSCRIPTION_AUTHORITY_LEN } from "./decode.js";
+export type { PolicyAccount, SubscriptionAuthorityAccount } from "./decode.js";
 
 export {
   buildCreateFixedDelegationInstruction,

@@ -184,10 +184,14 @@ export interface CreateFixedDelegationParams {
   amount: bigint;
   expiryTs: bigint;
   /**
-   * Must match the SubscriptionAuthority's real, current `init_id` — S&A
-   * rejects a mismatch. Callers reading a freshly-created authority can
-   * safely pass 0n; anything else needs the decoded real value (not yet
-   * implemented on our side — see the TODO in highLevel.ts).
+   * Must match the SubscriptionAuthority's real, current `init_id`, or S&A
+   * rejects the call with error 136 (`StaleSubscriptionAuthority`). If the
+   * authority is being created in the SAME transaction as this delegation,
+   * pass `UNKNOWN_INIT_ID` (constants.ts) — its landing slot, which becomes
+   * its `init_id`, can't be known in advance. Otherwise pass the real value,
+   * read with `decodeSubscriptionAuthority`. `createPolicyAndDelegation` in
+   * highLevel.ts handles this distinction automatically; call this builder
+   * directly only if you're bypassing that.
    */
   expectedSubscriptionAuthorityInitId: bigint;
 }

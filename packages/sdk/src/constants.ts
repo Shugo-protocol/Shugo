@@ -50,3 +50,18 @@ export const SUBSCRIPTION_AUTHORITY_SEED = Buffer.from("SubscriptionAuthority");
 export const DELEGATE_BASE_SEED = Buffer.from("delegation");
 /** event_engine.rs:25 — EVENT_AUTHORITY_SEED */
 export const EVENT_AUTHORITY_SEED = Buffer.from("event_authority");
+
+// --- SubscriptionAuthority generation ("init_id") --------------------------
+/**
+ * S&A's "unknown init_id" sentinel: `i64::MIN`.
+ * `program/src/constants.rs:60` — `pub const UNKNOWN_INIT_ID: i64 = i64::MIN;`
+ *
+ * A real `init_id` is `Clock::slot` at the moment the SubscriptionAuthority
+ * was created. `create_fixed_delegation` compares the caller's expected value
+ * against the stored one (`check_init_id`), rejecting a mismatch with error
+ * 136 `StaleSubscriptionAuthority`. This sentinel means "accept an authority
+ * created in the SAME slot", which is what a single transaction that creates
+ * the authority and the delegation together needs — the landing slot can't
+ * be known in advance, so no concrete value could ever work there.
+ */
+export const UNKNOWN_INIT_ID = -(2n ** 63n);

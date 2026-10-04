@@ -1,7 +1,7 @@
 import { Connection, PublicKey, Transaction } from "@solana/web3.js";
 
-import { TOKEN_PROGRAM_ID } from "./constants.js";
-import { type PolicyAccount, decodePolicy } from "./decode.js";
+import { TOKEN_PROGRAM_ID, UNKNOWN_INIT_ID } from "./constants.js";
+import { type PolicyAccount, decodePolicy, decodeSubscriptionAuthority } from "./decode.js";
 import { checkMintSupported, resolveExtraAccountsForMint } from "./extensions.js";
 import {
   buildCreateFixedDelegationInstruction,
@@ -68,17 +68,30 @@ export async function createPolicyAndDelegation(
   const tx = new Transaction();
 
   const existingAuthority = await params.connection.getAccountInfo(subscriptionAuthority);
-  let expectedInitId = 0n;
+  let expectedInitId: bigint;
   if (existingAuthority === null) {
     const humanAta = deriveAssociatedTokenAddress(params.human, params.mint, TOKEN_PROGRAM_ID);
     tx.add(buildInitializeSubscriptionAuthorityInstruction(params.human, params.mint, subscriptionAuthority, humanAta));
+    // The authority is created in THIS transaction, so its real `init_id`
+    // (the landing slot) can't be known yet. UNKNOWN_INIT_ID is S&A's
+    // sentinel for "accept an authority created in the same slot" — see the
+    // comment on it in constants.ts. Passing 0n here, which an earlier
+    // version of this function did, is wrong: it only ever happened to work
+    // in tests because LiteSVM's clock starts at slot 0, and fails against
+    // any real cluster with error 136 (StaleSubscriptionAuthority).
+    expectedInitId = UNKNOWN_INIT_ID;
   } else {
-    // TODO: decode the real `init_id` from `existingAuthority.data` instead
-    // of assuming 0n — we haven't written a SubscriptionAuthority decoder
-    // yet (only Policy has one, in decode.ts). Safe for the common case of
-    // a freshly-created authority; this path needs the real decoder before
-    // it correctly handles a human who already has one from an earlier
-    // policy or a direct S&A integration.
+    // A real authority already exists — read its actual init_id rather than
+    // guess. Confirm it's genuinely a SubscriptionAuthority for this
+    // (human, mint) pair before trusting its fields; nothing about this
+    // account's address alone proves that.
+    const decoded = decodeSubscriptionAuthority(existingAuthority.data);
+    if (!decoded.user.equals(params.human) || !decoded.tokenMint.equals(params.mint)) {
+      throw new Error(
+        `account at ${subscriptionAuthority.toBase58()} is not a SubscriptionAuthority for this human/mint pair`,
+      );
+    }
+    expectedInitId = decoded.initId;
   }
 
   tx.add(

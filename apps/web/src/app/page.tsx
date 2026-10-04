@@ -56,7 +56,6 @@ function IncomingMessage({ onOpenArch }: { onOpenArch: () => void }) {
     const playSound = (type: 'impact' | 'open') => {
       if (type === 'impact') {
         try {
-          // 1. Initialize Context only when needed for the synthesized bounce
           if (!audioCtxRef.current) {
             const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
             if (!AudioContextClass) return;
@@ -65,17 +64,14 @@ function IncomingMessage({ onOpenArch }: { onOpenArch: () => void }) {
           
           const ctx = audioCtxRef.current;
           
-          // 2. Try to resume if the browser suspended it
           if (ctx.state === 'suspended') {
             ctx.resume().catch(() => {});
           }
           
-          // 3. If it is STILL not running, abort to prevent queued sounds exploding later
           if (ctx.state !== 'running') {
             return;
           }
           
-          // 4. Play the synthesized "thud/bounce"
           const osc = ctx.createOscillator();
           const gain = ctx.createGain();
           osc.connect(gain);
@@ -96,11 +92,9 @@ function IncomingMessage({ onOpenArch }: { onOpenArch: () => void }) {
         }
       } else if (type === 'open') {
         try {
-          // Play the user's custom MP3 file for the message opening
           const audio = new Audio('/sound.mp3');
           audio.volume = 0.6;
           
-          // Catch and silently fail if the browser blocks the mp3 autoplay
           audio.play().catch(() => {
             console.warn("Autoplay blocked MP3 message sound.");
           });
@@ -110,13 +104,8 @@ function IncomingMessage({ onOpenArch }: { onOpenArch: () => void }) {
       }
     };
 
-    // 1. Start the falling animation
     const t1 = setTimeout(() => setStage('falling'), 150);
-    
-    // 2. Play the synthesized bounce EXACTLY at the moment of impact (45% of 2.5s = 1125ms)
     const t2 = setTimeout(() => playSound('impact'), 150 + 1125); 
-
-    // 3. Expand the message and play the MP3 exactly at the end (100% of 2.5s = 2500ms)
     const t3 = setTimeout(() => {
       setStage('expanded');
       playSound('open');
@@ -130,24 +119,20 @@ function IncomingMessage({ onOpenArch }: { onOpenArch: () => void }) {
       <style dangerouslySetInnerHTML={{__html: `
         @keyframes dropImpactBounce {
           0% {
-            /* Drops from Top-Left on an angle */
             transform: translate(-30vw, -70vh) rotate(-720deg) scale(0.4);
             opacity: 0;
             animation-timing-function: cubic-bezier(0.42, 0, 1, 1); 
           }
           45% {
-            /* Hits slightly to the left, squished */
             transform: translate(-25px, 60px) rotate(-25deg) scale3d(1.3, 0.6, 1);
             opacity: 1;
             animation-timing-function: cubic-bezier(0.21, 0.85, 0.33, 1);
           }
           75% {
-            /* Rebounds slightly to the right */
             transform: translate(5px, -15px) rotate(10deg) scale3d(0.95, 1.05, 1);
             animation-timing-function: cubic-bezier(0.45, 0.05, 0.55, 0.95);
           }
           100% {
-            /* Settles perfectly */
             transform: translate(0, 0) rotate(0deg) scale3d(1, 1, 1);
             opacity: 1;
           }
@@ -181,6 +166,78 @@ function IncomingMessage({ onOpenArch }: { onOpenArch: () => void }) {
   );
 }
 
+function HeroBackgroundRay() {
+  return (
+    <div className="absolute inset-0 w-full h-full overflow-hidden pointer-events-none -z-10 flex items-center justify-center">
+      <style dangerouslySetInnerHTML={{__html: `
+        @keyframes gentleRayReveal {
+          0% { 
+            opacity: 0; 
+            transform: translateX(-15vw); 
+          }
+          100% { 
+            opacity: 1; 
+            transform: translateX(0); 
+          }
+        }
+        .animate-ray-flow {
+          animation: gentleRayReveal 3.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+          animation-delay: 200ms;
+        }
+      `}} />
+      
+      <div className="w-full h-full opacity-0 animate-ray-flow absolute top-0 left-0">
+        <svg 
+          viewBox="0 0 100 100" 
+          preserveAspectRatio="none" 
+          className="w-[140vw] h-full opacity-40 dark:opacity-20 -ml-[20vw] blur-3xl mix-blend-screen dark:mix-blend-lighten"
+        >
+          <defs>
+            {/* Single color gradient, optimized opacities for a softer, organic glow */}
+            <linearGradient id="rayGradient" x1="0%" y1="50%" x2="100%" y2="50%">
+              <stop offset="0%" stopColor="#14F195" stopOpacity="0.0" />
+              <stop offset="30%" stopColor="#14F195" stopOpacity="0.15" />
+              <stop offset="60%" stopColor="#14F195" stopOpacity="0.35" />
+              <stop offset="100%" stopColor="#14F195" stopOpacity="0.6" />
+            </linearGradient>
+            
+            {/* Smooth, slow water flow effect optimized for performance */}
+            <filter id="gentle-water-flow" x="-20%" y="-20%" width="140%" height="140%" colorInterpolationFilters="sRGB">
+              <feTurbulence 
+                type="fractalNoise" 
+                baseFrequency="0.003 0.006" 
+                numOctaves="3" 
+                seed="4"
+                result="noise"
+              >
+                <animate 
+                  attributeName="baseFrequency" 
+                  values="0.003 0.006; 0.005 0.010; 0.003 0.006" 
+                  dur="20s" 
+                  repeatCount="indefinite" 
+                />
+              </feTurbulence>
+              <feDisplacementMap 
+                in="SourceGraphic" 
+                in2="noise" 
+                scale="12" 
+                xChannelSelector="R" 
+                yChannelSelector="G" 
+              />
+            </filter>
+          </defs>
+          
+          <polygon 
+            points="0,48 100,10 100,90 0,52" 
+            fill="url(#rayGradient)" 
+            filter="url(#gentle-water-flow)" 
+          />
+        </svg>
+      </div>
+    </div>
+  );
+}
+
 export default function Home() {
   const [copied, setCopied] = useState(false);
   const [isArchOpen, setIsArchOpen] = useState(false);
@@ -206,7 +263,9 @@ export default function Home() {
     <>
       <ArchitectureOverlay isOpen={isArchOpen} onClose={() => setIsArchOpen(false)} />
 
-      <main className="min-h-[calc(100vh-56px)] flex flex-col items-center pt-28 md:pt-36 px-4 sm:px-6 text-center lowercase bg-[#FFFFFF] dark:bg-[#0C0C0C] text-black dark:text-white transition-colors font-mono overflow-x-hidden relative">
+      <main className="min-h-[calc(100vh-56px)] flex flex-col items-center pt-28 md:pt-36 px-4 sm:px-6 text-center lowercase bg-[#FFFFFF] dark:bg-[#0C0C0C] text-black dark:text-white transition-colors font-mono overflow-x-hidden relative z-0">
+        
+        <HeroBackgroundRay />
 
         <div className="h-9 mb-7 flex justify-center w-full z-20">
           <IncomingMessage onOpenArch={() => setIsArchOpen(true)} />

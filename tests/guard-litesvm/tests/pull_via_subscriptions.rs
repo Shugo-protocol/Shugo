@@ -64,6 +64,14 @@ const EXECUTE_PULL_DISC: [u8; 8] = [0xb6, 0x35, 0x35, 0xf5, 0x8e, 0x9b, 0xf0, 0x
 const SET_PAUSED_DISC: [u8; 8] = [0x5b, 0x3c, 0x7d, 0xc0, 0xb0, 0xe1, 0xa6, 0xda];
 const UPDATE_POLICY_DISC: [u8; 8] = [0xd4, 0xf5, 0xf6, 0x07, 0xa3, 0x97, 0x12, 0x39];
 
+/// S&A's "unknown init_id" sentinel — `program/src/constants.rs:60`:
+/// `pub const UNKNOWN_INIT_ID: i64 = i64::MIN;`. Means "accept a
+/// SubscriptionAuthority created in the SAME slot as this call." Correct
+/// here specifically because `send_multi` below puts authority-creation and
+/// delegation-creation in one transaction, guaranteeing one slot — not a
+/// guess about LiteSVM's behavior across separate sends.
+const UNKNOWN_INIT_ID: i64 = i64::MIN;
+
 // Seeds — `state/subscription_authority.rs:47`, `state/common.rs:10`,
 // `event_engine.rs:44` (`EVENT_AUTHORITY_SEED`).
 const SUBSCRIPTION_AUTHORITY_SEED: &[u8] = b"SubscriptionAuthority";
@@ -144,26 +152,38 @@ fn setup() -> LiteSVM {
 
     let mut clock = svm.get_sysvar::<solana_clock::Clock>();
     clock.unix_timestamp = current_ts();
+    // A realistic, large, nonzero slot — not LiteSVM's default of 0. Devnet's
+    // real slot number is in the hundreds of millions, and this project
+    // shipped a real bug (the SDK passing a hardcoded 0 for
+    // expected_subscription_authority_init_id) that every one of these
+    // tests passed anyway, purely because slot 0 made that hardcoded value
+    // accidentally correct. Devnet caught it; this suite hadn't. Keeping
+    // slot at 0 here would still hide the same class of bug from whatever
+    // gets tested next.
+    clock.slot = 350_000_000;
     svm.set_sysvar::<solana_clock::Clock>(&clock);
 
     svm
 }
 
 fn send(svm: &mut LiteSVM, signers: &[&Keypair], payer: &Pubkey, ix: Instruction) -> litesvm::types::TransactionResult {
-    let tx = Transaction::new(signers, Message::new(&[ix], Some(payer)), svm.latest_blockhash());
+    send_multi(svm, signers, payer, &[ix])
+}
+
+/// Sends several instructions as ONE transaction — needed specifically for
+/// initialize_subscription_authority + create_fixed_delegation together,
+/// since UNKNOWN_INIT_ID's "same slot" contract is only actually guaranteed
+/// when both land in the same transaction, not just nearby in time.
+fn send_multi(
+    svm: &mut LiteSVM,
+    signers: &[&Keypair],
+    payer: &Pubkey,
+    ixs: &[Instruction],
+) -> litesvm::types::TransactionResult {
+    let tx = Transaction::new(signers, Message::new(ixs, Some(payer)), svm.latest_blockhash());
     let result = svm.send_transaction(tx);
     svm.expire_blockhash();
     result
-}
-
-fn advance_clock(svm: &mut LiteSVM, seconds: i64) {
-    let mut clock = svm.get_sysvar::<solana_clock::Clock>();
-    clock.unix_timestamp += seconds;
-    // Bump slot too, matching the real repo's own `move_clock_forward` —
-    // neither our checks nor S&A's read slot directly, but there's no
-    // reason to diverge from a pattern already proven not to confuse LiteSVM.
-    clock.slot += (seconds as u64) * 2;
-    svm.set_sysvar::<solana_clock::Clock>(&clock);
 }
 
 // ---------------------------------------------------------------------
@@ -212,6 +232,16 @@ fn init_ata(svm: &mut LiteSVM, mint: Pubkey, owner: Pubkey, amount: u64) -> Pubk
 fn ata_balance(svm: &LiteSVM, ata: &Pubkey) -> u64 {
     let account = svm.get_account(ata).unwrap();
     TokenAccountState::unpack(&account.data[..TokenAccountState::LEN]).unwrap().amount
+}
+
+fn advance_clock(svm: &mut LiteSVM, seconds: i64) {
+    let mut clock = svm.get_sysvar::<solana_clock::Clock>();
+    clock.unix_timestamp += seconds;
+    // Bump slot too, matching the real repo's own `move_clock_forward` —
+    // neither our checks nor S&A's read slot directly, but there's no
+    // reason to diverge from a pattern already proven not to confuse LiteSVM.
+    clock.slot += (seconds as u64) * 2;
+    svm.set_sysvar::<solana_clock::Clock>(&clock);
 }
 
 // ---------------------------------------------------------------------
@@ -363,8 +393,7 @@ fn build_execute_pull_ix(
     }
 }
 
-/// Our own `set_paused` — account order matches `SetPaused` in
-/// `instructions/set_paused.rs`: human, policy.
+/// Our own `set_paused` — account order matches `SetPaused`.
 fn build_set_paused_ix(human: &Pubkey, policy: &Pubkey, paused: bool) -> Instruction {
     #[derive(BorshSerialize)]
     struct Args {
@@ -380,8 +409,7 @@ fn build_set_paused_ix(human: &Pubkey, policy: &Pubkey, paused: bool) -> Instruc
     }
 }
 
-/// Our own `update_policy` — account order matches `UpdatePolicy` in
-/// `instructions/update_policy.rs`: human, policy.
+/// Our own `update_policy` — account order matches `UpdatePolicy`.
 #[allow(clippy::too_many_arguments)]
 fn build_update_policy_ix(
     human: &Pubkey,
@@ -418,7 +446,7 @@ fn build_update_policy_ix(
 }
 
 // ---------------------------------------------------------------------
-// The test.
+// The tests.
 // ---------------------------------------------------------------------
 
 #[test]
@@ -456,21 +484,30 @@ fn policy_pda_pulls_real_tokens_through_a_real_delegation() {
     let result = send(&mut svm, &[&alice], &alice.pubkey(), init_policy_ix);
     assert!(result.is_ok(), "init_policy failed: {:?}", result.err());
 
-    // 2. Alice initializes her real SubscriptionAuthority for this mint.
+    // 2. Alice initializes her real SubscriptionAuthority AND creates a REAL
+    //    FixedDelegation — delegatee is our Policy PDA, not a raw keypair —
+    //    in ONE transaction, so UNKNOWN_INIT_ID's same-slot contract is
+    //    guaranteed, not assumed. This is the line that either proves or
+    //    disproves the whole architecture.
     let init_sa_ix = build_init_subscription_authority_ix(&alice.pubkey(), &mint, &alice_ata);
-    let result = send(&mut svm, &[&alice], &alice.pubkey(), init_sa_ix);
-    assert!(result.is_ok(), "initialize_subscription_authority failed: {:?}", result.err());
-
-    // 3. Alice creates a REAL FixedDelegation — delegatee is our Policy PDA,
-    //    not a raw keypair. This is the line that either proves or disproves
-    //    the whole architecture.
     let expiry_ts = current_ts() + 86_400;
-    let (create_delegation_ix, delegation) =
-        build_create_fixed_delegation_ix(&alice.pubkey(), &mint, &policy, 0, 50_000_000, expiry_ts, 0);
-    let result = send(&mut svm, &[&alice], &alice.pubkey(), create_delegation_ix);
-    assert!(result.is_ok(), "create_fixed_delegation failed: {:?}", result.err());
+    let (create_delegation_ix, delegation) = build_create_fixed_delegation_ix(
+        &alice.pubkey(),
+        &mint,
+        &policy,
+        0,
+        50_000_000,
+        expiry_ts,
+        UNKNOWN_INIT_ID,
+    );
+    let result = send_multi(&mut svm, &[&alice], &alice.pubkey(), &[init_sa_ix, create_delegation_ix]);
+    assert!(
+        result.is_ok(),
+        "initialize_subscription_authority + create_fixed_delegation failed: {:?}",
+        result.err()
+    );
 
-    // 4. Bob (the agent) calls OUR execute_pull. Internally this evaluates
+    // 3. Bob (the agent) calls OUR execute_pull. Internally this evaluates
     //    the policy, then invoke_signed's into S&A's transfer_fixed with our
     //    Policy PDA signing as delegatee.
     let (sa_pda, _) = subscription_authority_pda(&alice.pubkey(), &mint);
@@ -489,7 +526,7 @@ fn policy_pda_pulls_real_tokens_through_a_real_delegation() {
     let result = send(&mut svm, &[&bob], &bob.pubkey(), pull_ix);
     assert!(result.is_ok(), "execute_pull failed: {:?}", result.err());
 
-    // 5. The actual proof: did real tokens actually move?
+    // 4. The actual proof: did real tokens actually move?
     assert_eq!(ata_balance(&svm, &charlie_ata), 30_000_000, "charlie should have received the pull");
     assert_eq!(ata_balance(&svm, &alice_ata), 70_000_000, "alice's balance should be debited");
 }
@@ -523,13 +560,12 @@ fn execute_pull_denies_a_destination_not_on_the_allowlist() {
     )
     .expect("init_policy failed");
 
-    send(&mut svm, &[&alice], &alice.pubkey(), build_init_subscription_authority_ix(&alice.pubkey(), &mint, &alice_ata))
-        .expect("initialize_subscription_authority failed");
-
+    let init_sa_ix = build_init_subscription_authority_ix(&alice.pubkey(), &mint, &alice_ata);
     let expiry_ts = current_ts() + 86_400;
     let (create_ix, delegation) =
-        build_create_fixed_delegation_ix(&alice.pubkey(), &mint, &policy, 0, 50_000_000, expiry_ts, 0);
-    send(&mut svm, &[&alice], &alice.pubkey(), create_ix).expect("create_fixed_delegation failed");
+        build_create_fixed_delegation_ix(&alice.pubkey(), &mint, &policy, 0, 50_000_000, expiry_ts, UNKNOWN_INIT_ID);
+    send_multi(&mut svm, &[&alice], &alice.pubkey(), &[init_sa_ix, create_ix])
+        .expect("initialize_subscription_authority + create_fixed_delegation failed");
 
     let (sa_pda, _) = subscription_authority_pda(&alice.pubkey(), &mint);
     // This is exactly the redirect-to-a-third-party shape S&A itself allows
@@ -595,13 +631,19 @@ fn build_scenario(per_call_cap: u64, velocity_cap: u64, velocity_window_s: i64, 
     );
     send(&mut svm, &[&alice], &alice.pubkey(), init_policy_ix).expect("init_policy failed");
 
-    send(&mut svm, &[&alice], &alice.pubkey(), build_init_subscription_authority_ix(&alice.pubkey(), &mint, &alice_ata))
-        .expect("initialize_subscription_authority failed");
-
+    let init_sa_ix = build_init_subscription_authority_ix(&alice.pubkey(), &mint, &alice_ata);
     let expiry_ts = current_ts() + 86_400;
-    let (create_ix, delegation) =
-        build_create_fixed_delegation_ix(&alice.pubkey(), &mint, &policy, 0, delegation_amount, expiry_ts, 0);
-    send(&mut svm, &[&alice], &alice.pubkey(), create_ix).expect("create_fixed_delegation failed");
+    let (create_ix, delegation) = build_create_fixed_delegation_ix(
+        &alice.pubkey(),
+        &mint,
+        &policy,
+        0,
+        delegation_amount,
+        expiry_ts,
+        UNKNOWN_INIT_ID,
+    );
+    send_multi(&mut svm, &[&alice], &alice.pubkey(), &[init_sa_ix, create_ix])
+        .expect("initialize_subscription_authority + create_fixed_delegation failed");
 
     let (sa_pda, _) = subscription_authority_pda(&alice.pubkey(), &mint);
 
