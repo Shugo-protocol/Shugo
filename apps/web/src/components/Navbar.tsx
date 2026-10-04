@@ -95,7 +95,7 @@ function DesktopDropdown({
   mainHref: string;
   onMouseEnter: (e: React.MouseEvent<HTMLDivElement>) => void;
 }) {
-  // State for the inner sliding pill animation
+  // Inner sliding pill animation for dropdown items
   const [pillStyle, setPillStyle] = useState({ transform: 'translate(0px, 0px)', width: 0, height: 0, opacity: 0 });
 
   const handleItemEnter = (e: React.MouseEvent<HTMLAnchorElement>) => {
@@ -175,11 +175,11 @@ export default function Navbar() {
     setExpandedSection(null);
   }, [pathname]);
 
-  // Clean, modern scroll locking without layout jumps
+  // Clean scroll locking without layout jumps
   useEffect(() => {
     if (mobileMenuOpen || faqOpen) {
       document.body.style.overflow = "hidden";
-      document.body.style.touchAction = "none"; // prevents iOS background scroll
+      document.body.style.touchAction = "none";
     } else {
       document.body.style.overflow = "";
       document.body.style.touchAction = "";
@@ -221,12 +221,13 @@ export default function Navbar() {
               </Link>
             </div>
 
+            {/* FIXED: Removed the erroneous 'relative' class from the end, restoring exact center positioning */}
             <nav 
               onMouseLeave={() => setHoverStyle(prev => ({ ...prev, opacity: 0 }))}
-              className="hidden lg:flex absolute left-1/2 -translate-x-1/2 items-center justify-center gap-1 xl:gap-2 z-10 relative"
+              className="hidden lg:flex absolute left-1/2 -translate-x-1/2 items-center justify-center gap-1 xl:gap-2 z-10"
             >
               
-              {/* Sliding Hover Pill (GPU Accelerated via transform) for main Nav */}
+              {/* Sliding Hover Pill (GPU Accelerated) */}
               <div 
                 className="absolute top-1/2 -translate-y-1/2 left-0 h-9 bg-zinc-100/80 dark:bg-white/10 rounded-full transition-all duration-300 ease-out pointer-events-none z-0 will-change-transform"
                 style={{ 

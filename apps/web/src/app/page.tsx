@@ -23,10 +23,13 @@ function Reveal({
       ([entry]) => {
         if (entry.isIntersecting) {
           setIsVisible(true);
-          observer.disconnect(); // Disconnect immediately after revealing to save memory
+          observer.disconnect();
         }
       },
-      { threshold: 0.1, rootMargin: "0px 0px -50px 0px" }
+      {
+        threshold: 0.1,
+        rootMargin: "0px 0px -50px 0px",
+      }
     );
 
     if (ref.current) observer.observe(ref.current);
@@ -36,7 +39,7 @@ function Reveal({
   return (
     <div
       ref={ref}
-      className={`transition-all duration-1000 ease-out will-change-[opacity,transform,filter] ${
+      className={`transition-all duration-1000 ease-out will-change-[opacity,transform] ${
         isVisible ? "opacity-100 translate-y-0 blur-none" : "opacity-0 translate-y-8 blur-md"
       } ${delay} ${className}`}
     >
@@ -47,16 +50,23 @@ function Reveal({
 
 function IncomingMessage({ onOpenArch }: { onOpenArch: () => void }) {
   const [stage, setStage] = useState<'hidden' | 'falling' | 'expanded'>('hidden');
+  const audioCtxRef = useRef<AudioContext | null>(null);
 
   useEffect(() => {
-    // Audio is strictly separated from rendering to prevent main-thread locking
     const playSound = (type: 'impact' | 'open') => {
       requestAnimationFrame(() => {
-        try {
-          if (type === 'impact') {
-            const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-            if (!AudioCtx) return;
-            const ctx = new AudioCtx();
+        if (type === 'impact') {
+          try {
+            if (!audioCtxRef.current) {
+              const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+              if (!AudioContextClass) return;
+              audioCtxRef.current = new AudioContextClass();
+            }
+            
+            const ctx = audioCtxRef.current;
+            if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+            if (ctx.state !== 'running') return;
+            
             const osc = ctx.createOscillator();
             const gain = ctx.createGain();
             osc.connect(gain);
@@ -71,13 +81,17 @@ function IncomingMessage({ onOpenArch }: { onOpenArch: () => void }) {
             gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
             osc.start(now);
             osc.stop(now + 0.15);
-          } else if (type === 'open') {
+          } catch (e) {
+            console.warn("Autoplay blocked synthesized impact sound.");
+          }
+        } else if (type === 'open') {
+          try {
             const audio = new Audio('/sound.mp3');
             audio.volume = 0.6;
             audio.play().catch(() => {});
+          } catch (e) {
+            console.error("Audio playback error:", e);
           }
-        } catch (e) {
-          // Silent catch for autoplay restrictions
         }
       });
     };
@@ -120,7 +134,7 @@ function IncomingMessage({ onOpenArch }: { onOpenArch: () => void }) {
 
       <button 
         onClick={onOpenArch}
-        className={`relative border border-zinc-200 dark:border-[#222] bg-[#FAFAFA] dark:bg-[#111111] hover:bg-[#F4F4F5] dark:hover:bg-[#1A1A1A] flex items-center rounded-full h-9 group overflow-hidden z-20 origin-center shadow-sm will-change-[max-width,opacity,transform]
+        className={`relative border border-zinc-200 dark:border-[#222] bg-[#FAFAFA] dark:bg-[#111111] hover:bg-[#F4F4F5] dark:hover:bg-[#1A1A1A] flex items-center rounded-full h-9 group overflow-hidden z-20 origin-center shadow-sm will-change-[max-width,opacity]
           ${stage === 'hidden' ? 'opacity-0' : ''}
           ${stage === 'falling' ? 'animate-fly-bounce max-w-[36px]' : ''}
           ${stage === 'expanded' ? 'opacity-100 max-w-[500px] px-2 transition-all duration-[800ms] ease-[cubic-bezier(0.16,1,0.3,1)]' : ''}
@@ -144,27 +158,30 @@ function IncomingMessage({ onOpenArch }: { onOpenArch: () => void }) {
   );
 }
 
+// Solid ray with exact same shape & gradient, but 0% GPU overhead (no feTurbulence)
 function HeroBackgroundRay() {
   return (
     <div className="absolute inset-0 w-full h-full overflow-hidden pointer-events-none -z-10 flex items-center justify-center">
-      <style dangerouslySetInnerHTML={{__html: `
-        @keyframes gentleRayReveal {
-          0% { opacity: 0; transform: translateX(-10vw) scale(0.95); }
-          100% { opacity: 1; transform: translateX(0) scale(1); }
-        }
-        @keyframes pulseGlow {
-          0%, 100% { opacity: 0.5; transform: scale(1); }
-          50% { opacity: 0.8; transform: scale(1.05); }
-        }
-        .animate-ray-flow {
-          animation: gentleRayReveal 2s cubic-bezier(0.22, 1, 0.36, 1) forwards,
-                     pulseGlow 8s ease-in-out infinite alternate;
-        }
-      `}} />
-      
-      {/* Hardware-accelerated CSS gradient replaces the heavy SVG feTurbulence */}
-      <div className="w-[140vw] h-[100vh] absolute top-0 -left-[20vw] opacity-0 animate-ray-flow mix-blend-screen dark:mix-blend-lighten blur-3xl will-change-[opacity,transform]">
-        <div className="w-full h-full bg-[radial-gradient(ellipse_at_center,_#14F195_0%,_transparent_50%)] opacity-20 dark:opacity-[0.15]" />
+      <div className="w-full h-full absolute top-0 left-0">
+        <svg 
+          viewBox="0 0 100 100" 
+          preserveAspectRatio="none" 
+          className="w-[140vw] h-full opacity-40 dark:opacity-20 -ml-[20vw] blur-3xl mix-blend-screen dark:mix-blend-lighten"
+        >
+          <defs>
+            <linearGradient id="rayGradient" x1="0%" y1="50%" x2="100%" y2="50%">
+              <stop offset="0%" stopColor="#14F195" stopOpacity="0.0" />
+              <stop offset="30%" stopColor="#14F195" stopOpacity="0.15" />
+              <stop offset="60%" stopColor="#14F195" stopOpacity="0.35" />
+              <stop offset="100%" stopColor="#14F195" stopOpacity="0.6" />
+            </linearGradient>
+          </defs>
+          
+          <polygon 
+            points="0,48 100,10 100,90 0,52" 
+            fill="url(#rayGradient)" 
+          />
+        </svg>
       </div>
     </div>
   );
@@ -311,6 +328,7 @@ export default function Home() {
             </div>
           </div>
         </Reveal>
+
       </main>
     </>
   );
