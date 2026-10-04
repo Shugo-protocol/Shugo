@@ -23,23 +23,20 @@ function Reveal({
       ([entry]) => {
         if (entry.isIntersecting) {
           setIsVisible(true);
-          observer.unobserve(entry.target);
+          observer.disconnect(); // Disconnect immediately after revealing to save memory
         }
       },
-      {
-        threshold: 0.1,
-        rootMargin: "0px 0px -50px 0px",
-      }
+      { threshold: 0.1, rootMargin: "0px 0px -50px 0px" }
     );
 
     if (ref.current) observer.observe(ref.current);
-    return () => { if (ref.current) observer.unobserve(ref.current); };
+    return () => observer.disconnect();
   }, []);
 
   return (
     <div
       ref={ref}
-      className={`transition-all duration-1000 ease-out ${
+      className={`transition-all duration-1000 ease-out will-change-[opacity,transform,filter] ${
         isVisible ? "opacity-100 translate-y-0 blur-none" : "opacity-0 translate-y-8 blur-md"
       } ${delay} ${className}`}
     >
@@ -50,58 +47,39 @@ function Reveal({
 
 function IncomingMessage({ onOpenArch }: { onOpenArch: () => void }) {
   const [stage, setStage] = useState<'hidden' | 'falling' | 'expanded'>('hidden');
-  const audioCtxRef = useRef<AudioContext | null>(null);
 
   useEffect(() => {
+    // Audio is strictly separated from rendering to prevent main-thread locking
     const playSound = (type: 'impact' | 'open') => {
-      if (type === 'impact') {
+      requestAnimationFrame(() => {
         try {
-          if (!audioCtxRef.current) {
-            const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-            if (!AudioContextClass) return;
-            audioCtxRef.current = new AudioContextClass();
+          if (type === 'impact') {
+            const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+            if (!AudioCtx) return;
+            const ctx = new AudioCtx();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            
+            const now = ctx.currentTime;
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(150, now);
+            osc.frequency.exponentialRampToValueAtTime(40, now + 0.1);
+            gain.gain.setValueAtTime(0, now);
+            gain.gain.linearRampToValueAtTime(0.6, now + 0.02);
+            gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+            osc.start(now);
+            osc.stop(now + 0.15);
+          } else if (type === 'open') {
+            const audio = new Audio('/sound.mp3');
+            audio.volume = 0.6;
+            audio.play().catch(() => {});
           }
-          
-          const ctx = audioCtxRef.current;
-          
-          if (ctx.state === 'suspended') {
-            ctx.resume().catch(() => {});
-          }
-          
-          if (ctx.state !== 'running') {
-            return;
-          }
-          
-          const osc = ctx.createOscillator();
-          const gain = ctx.createGain();
-          osc.connect(gain);
-          gain.connect(ctx.destination);
-          
-          const now = ctx.currentTime;
-          
-          osc.type = 'sine';
-          osc.frequency.setValueAtTime(150, now);
-          osc.frequency.exponentialRampToValueAtTime(40, now + 0.1);
-          gain.gain.setValueAtTime(0, now);
-          gain.gain.linearRampToValueAtTime(0.6, now + 0.02);
-          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
-          osc.start(now);
-          osc.stop(now + 0.15);
         } catch (e) {
-          console.warn("Autoplay blocked synthesized impact sound.");
+          // Silent catch for autoplay restrictions
         }
-      } else if (type === 'open') {
-        try {
-          const audio = new Audio('/sound.mp3');
-          audio.volume = 0.6;
-          
-          audio.play().catch(() => {
-            console.warn("Autoplay blocked MP3 message sound.");
-          });
-        } catch (e) {
-          console.error("Audio playback error:", e);
-        }
-      }
+      });
     };
 
     const t1 = setTimeout(() => setStage('falling'), 150);
@@ -142,7 +120,7 @@ function IncomingMessage({ onOpenArch }: { onOpenArch: () => void }) {
 
       <button 
         onClick={onOpenArch}
-        className={`relative border border-zinc-200 dark:border-[#222] bg-[#FAFAFA] dark:bg-[#111111] hover:bg-[#F4F4F5] dark:hover:bg-[#1A1A1A] flex items-center rounded-full h-9 group overflow-hidden z-20 origin-center shadow-sm
+        className={`relative border border-zinc-200 dark:border-[#222] bg-[#FAFAFA] dark:bg-[#111111] hover:bg-[#F4F4F5] dark:hover:bg-[#1A1A1A] flex items-center rounded-full h-9 group overflow-hidden z-20 origin-center shadow-sm will-change-[max-width,opacity,transform]
           ${stage === 'hidden' ? 'opacity-0' : ''}
           ${stage === 'falling' ? 'animate-fly-bounce max-w-[36px]' : ''}
           ${stage === 'expanded' ? 'opacity-100 max-w-[500px] px-2 transition-all duration-[800ms] ease-[cubic-bezier(0.16,1,0.3,1)]' : ''}
@@ -171,68 +149,22 @@ function HeroBackgroundRay() {
     <div className="absolute inset-0 w-full h-full overflow-hidden pointer-events-none -z-10 flex items-center justify-center">
       <style dangerouslySetInnerHTML={{__html: `
         @keyframes gentleRayReveal {
-          0% { 
-            opacity: 0; 
-            transform: translateX(-15vw); 
-          }
-          100% { 
-            opacity: 1; 
-            transform: translateX(0); 
-          }
+          0% { opacity: 0; transform: translateX(-10vw) scale(0.95); }
+          100% { opacity: 1; transform: translateX(0) scale(1); }
+        }
+        @keyframes pulseGlow {
+          0%, 100% { opacity: 0.5; transform: scale(1); }
+          50% { opacity: 0.8; transform: scale(1.05); }
         }
         .animate-ray-flow {
-          animation: gentleRayReveal 3.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
-          animation-delay: 200ms;
+          animation: gentleRayReveal 2s cubic-bezier(0.22, 1, 0.36, 1) forwards,
+                     pulseGlow 8s ease-in-out infinite alternate;
         }
       `}} />
       
-      <div className="w-full h-full opacity-0 animate-ray-flow absolute top-0 left-0">
-        <svg 
-          viewBox="0 0 100 100" 
-          preserveAspectRatio="none" 
-          className="w-[140vw] h-full opacity-40 dark:opacity-20 -ml-[20vw] blur-3xl mix-blend-screen dark:mix-blend-lighten"
-        >
-          <defs>
-            {/* Single color gradient, optimized opacities for a softer, organic glow */}
-            <linearGradient id="rayGradient" x1="0%" y1="50%" x2="100%" y2="50%">
-              <stop offset="0%" stopColor="#14F195" stopOpacity="0.0" />
-              <stop offset="30%" stopColor="#14F195" stopOpacity="0.15" />
-              <stop offset="60%" stopColor="#14F195" stopOpacity="0.35" />
-              <stop offset="100%" stopColor="#14F195" stopOpacity="0.6" />
-            </linearGradient>
-            
-            {/* Smooth, slow water flow effect optimized for performance */}
-            <filter id="gentle-water-flow" x="-20%" y="-20%" width="140%" height="140%" colorInterpolationFilters="sRGB">
-              <feTurbulence 
-                type="fractalNoise" 
-                baseFrequency="0.003 0.006" 
-                numOctaves="3" 
-                seed="4"
-                result="noise"
-              >
-                <animate 
-                  attributeName="baseFrequency" 
-                  values="0.003 0.006; 0.005 0.010; 0.003 0.006" 
-                  dur="20s" 
-                  repeatCount="indefinite" 
-                />
-              </feTurbulence>
-              <feDisplacementMap 
-                in="SourceGraphic" 
-                in2="noise" 
-                scale="12" 
-                xChannelSelector="R" 
-                yChannelSelector="G" 
-              />
-            </filter>
-          </defs>
-          
-          <polygon 
-            points="0,48 100,10 100,90 0,52" 
-            fill="url(#rayGradient)" 
-            filter="url(#gentle-water-flow)" 
-          />
-        </svg>
+      {/* Hardware-accelerated CSS gradient replaces the heavy SVG feTurbulence */}
+      <div className="w-[140vw] h-[100vh] absolute top-0 -left-[20vw] opacity-0 animate-ray-flow mix-blend-screen dark:mix-blend-lighten blur-3xl will-change-[opacity,transform]">
+        <div className="w-full h-full bg-[radial-gradient(ellipse_at_center,_#14F195_0%,_transparent_50%)] opacity-20 dark:opacity-[0.15]" />
       </div>
     </div>
   );
@@ -379,7 +311,6 @@ export default function Home() {
             </div>
           </div>
         </Reveal>
-
       </main>
     </>
   );

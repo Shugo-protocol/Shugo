@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ArrowUpRight, ChevronDown, Menu, X, HelpCircle } from "lucide-react";
@@ -95,6 +95,19 @@ function DesktopDropdown({
   mainHref: string;
   onMouseEnter: (e: React.MouseEvent<HTMLDivElement>) => void;
 }) {
+  // State for the inner sliding pill animation
+  const [pillStyle, setPillStyle] = useState({ transform: 'translate(0px, 0px)', width: 0, height: 0, opacity: 0 });
+
+  const handleItemEnter = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    const target = e.currentTarget;
+    setPillStyle({
+      transform: `translate(${target.offsetLeft}px, ${target.offsetTop}px)`,
+      width: target.offsetWidth,
+      height: target.offsetHeight,
+      opacity: 1
+    });
+  };
+
   return (
     <div 
       className="relative group flex items-center h-14 z-10"
@@ -109,21 +122,38 @@ function DesktopDropdown({
       </Link>
       
       <div className="absolute top-full left-1/2 -translate-x-1/2 pt-2 invisible opacity-0 translate-y-2 group-hover:visible group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300 ease-out z-50 w-[460px] xl:w-[500px]">
-        <div className="bg-[#FFFFFF] dark:bg-[#0C0C0C] border border-zinc-200 dark:border-[#222] shadow-2xl rounded-xl p-2.5 grid grid-cols-2 gap-2 text-xs">
-          {items.map((item) => (
-            <Link 
-              key={item.title} 
-              href={item.href} 
-              target={item.external ? "_blank" : undefined} 
-              className="p-2.5 rounded-lg border border-transparent hover:border-zinc-200 dark:hover:border-[#222] hover:bg-zinc-50 dark:hover:bg-[#141414] transition-all flex flex-col justify-between group/card"
-            >
-              <div className="flex items-center justify-between text-black dark:text-white font-medium mb-1">
-                <span>{item.title}</span>
-                <ArrowUpRight size={12} className="opacity-0 group-hover/card:opacity-100 transition-opacity text-zinc-400" />
-              </div>
-              <p className="text-zinc-500 dark:text-zinc-500 text-[11px] leading-relaxed">{item.desc}</p>
-            </Link>
-          ))}
+        <div className="bg-[#FFFFFF] dark:bg-[#0C0C0C] border border-zinc-200 dark:border-[#222] shadow-2xl rounded-xl p-2.5">
+          <div 
+            className="grid grid-cols-2 gap-2 text-xs relative z-10"
+            onMouseLeave={() => setPillStyle(prev => ({ ...prev, opacity: 0 }))}
+          >
+            {/* Sliding Background Pill for dropdown items */}
+            <div 
+              className="absolute top-0 left-0 z-0 rounded-lg bg-zinc-50 dark:bg-[#141414] border border-zinc-200 dark:border-[#222] transition-all duration-300 ease-out pointer-events-none will-change-transform"
+              style={{ 
+                transform: pillStyle.transform, 
+                width: `${pillStyle.width}px`, 
+                height: `${pillStyle.height}px`,
+                opacity: pillStyle.opacity 
+              }}
+            />
+
+            {items.map((item) => (
+              <Link 
+                key={item.title} 
+                href={item.href} 
+                target={item.external ? "_blank" : undefined} 
+                onMouseEnter={handleItemEnter}
+                className="p-2.5 rounded-lg border border-transparent transition-all flex flex-col justify-between group/card relative z-10"
+              >
+                <div className="flex items-center justify-between text-black dark:text-white font-medium mb-1">
+                  <span>{item.title}</span>
+                  <ArrowUpRight size={12} className="opacity-0 group-hover/card:opacity-100 transition-opacity text-zinc-400" />
+                </div>
+                <p className="text-zinc-500 dark:text-zinc-500 text-[11px] leading-relaxed">{item.desc}</p>
+              </Link>
+            ))}
+          </div>
         </div>
       </div>
     </div>
@@ -134,17 +164,10 @@ export default function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [faqOpen, setFaqOpen] = useState(false);
   const [expandedSection, setExpandedSection] = useState<string | null>(null);
-  const [isMounted, setIsMounted] = useState(false);
   const pathname = usePathname();
   
-  // State and ref for the gliding background hover pill
-  const [hoveredRect, setHoveredRect] = useState({ left: 0, width: 0, opacity: 0 });
-  const navRef = useRef<HTMLElement>(null);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setIsMounted(true), 100);
-    return () => clearTimeout(timer);
-  }, []);
+  // Track left offset and width for GPU-accelerated pill sliding in the main nav
+  const [hoverStyle, setHoverStyle] = useState({ transform: 'translateX(0px)', width: 0, opacity: 0 });
 
   useEffect(() => {
     setMobileMenuOpen(false);
@@ -152,23 +175,14 @@ export default function Navbar() {
     setExpandedSection(null);
   }, [pathname]);
 
-  // Lock body scroll cleanly on mobile & desktop without layout jump
+  // Clean, modern scroll locking without layout jumps
   useEffect(() => {
     if (mobileMenuOpen || faqOpen) {
-      const scrollY = window.scrollY;
-      document.body.style.position = "fixed";
-      document.body.style.top = `-${scrollY}px`;
-      document.body.style.width = "100%";
       document.body.style.overflow = "hidden";
+      document.body.style.touchAction = "none"; // prevents iOS background scroll
     } else {
-      const scrollY = document.body.style.top;
-      document.body.style.position = "";
-      document.body.style.top = "";
-      document.body.style.width = "";
       document.body.style.overflow = "";
-      if (scrollY) {
-        window.scrollTo(0, parseInt(scrollY || "0") * -1);
-      }
+      document.body.style.touchAction = "";
     }
   }, [mobileMenuOpen, faqOpen]);
 
@@ -176,26 +190,26 @@ export default function Navbar() {
     setExpandedSection((prev) => (prev === section ? null : section));
   };
 
-  // Calculates dimensions to slide the pill behind hovered items
   const handleMouseEnter = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!navRef.current) return;
-    const navRect = navRef.current.getBoundingClientRect();
-    const targetRect = e.currentTarget.getBoundingClientRect();
-    
-    setHoveredRect({
-      left: targetRect.left - navRect.left,
-      width: targetRect.width,
+    const target = e.currentTarget;
+    setHoverStyle({
+      transform: `translateX(${target.offsetLeft}px)`,
+      width: target.offsetWidth,
       opacity: 1
     });
   };
 
   return (
     <>
-      <header 
-        className={`fixed top-0 left-0 right-0 z-40 font-mono text-sm lowercase bg-transparent transition-all duration-[800ms] ease-out ${
-          isMounted ? "translate-y-0 opacity-100" : "-translate-y-8 opacity-0"
-        }`}
-      >
+      <style dangerouslySetInnerHTML={{__html: `
+        @keyframes navSlideDown {
+          from { transform: translateY(-2rem); opacity: 0; }
+          to { transform: translateY(0); opacity: 1; }
+        }
+        .animate-nav-enter { animation: navSlideDown 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+      `}} />
+
+      <header className="fixed top-0 left-0 right-0 z-40 font-mono text-sm lowercase bg-transparent animate-nav-enter">
         <div className="absolute inset-x-0 top-0 h-28 sm:h-32 bg-white/50 dark:bg-[#0C0C0C]/50 backdrop-blur-xl [mask-image:linear-gradient(to_bottom,black_45%,transparent_100%)] pointer-events-none -z-10" />
 
         <div className="w-full">
@@ -207,20 +221,18 @@ export default function Navbar() {
               </Link>
             </div>
 
-            {/* Nav container acting as reference point for absolute hover pill */}
             <nav 
-              ref={navRef}
-              onMouseLeave={() => setHoveredRect(prev => ({ ...prev, opacity: 0 }))}
-              className="hidden lg:flex absolute left-1/2 -translate-x-1/2 items-center justify-center gap-1 xl:gap-2 z-10"
+              onMouseLeave={() => setHoverStyle(prev => ({ ...prev, opacity: 0 }))}
+              className="hidden lg:flex absolute left-1/2 -translate-x-1/2 items-center justify-center gap-1 xl:gap-2 z-10 relative"
             >
               
-              {/* Sliding Hover Pill */}
+              {/* Sliding Hover Pill (GPU Accelerated via transform) for main Nav */}
               <div 
-                className="absolute top-1/2 -translate-y-1/2 h-9 bg-zinc-100/80 dark:bg-white/10 rounded-full transition-all duration-300 ease-out pointer-events-none z-0"
+                className="absolute top-1/2 -translate-y-1/2 left-0 h-9 bg-zinc-100/80 dark:bg-white/10 rounded-full transition-all duration-300 ease-out pointer-events-none z-0 will-change-transform"
                 style={{ 
-                  left: `${hoveredRect.left}px`, 
-                  width: `${hoveredRect.width}px`, 
-                  opacity: hoveredRect.opacity 
+                  transform: hoverStyle.transform, 
+                  width: `${hoverStyle.width}px`, 
+                  opacity: hoverStyle.opacity 
                 }}
               />
 
@@ -271,6 +283,7 @@ export default function Navbar() {
           </div>
         </div>
 
+        {/* Mobile Menu */}
         <div 
           className={`lg:hidden fixed inset-x-0 top-14 h-[calc(100dvh-3.5rem)] bg-white/95 dark:bg-[#0C0C0C]/95 backdrop-blur-2xl border-t border-zinc-200/80 dark:border-[#222] transition-all duration-300 ease-out z-50 flex flex-col justify-between overflow-y-auto px-4 py-5 sm:px-6 ${
             mobileMenuOpen ? "opacity-100 translate-y-0 pointer-events-auto" : "opacity-0 -translate-y-4 pointer-events-none"
@@ -391,7 +404,6 @@ export default function Navbar() {
               </div>
             </div>
 
-  
             <button 
               onClick={() => {
                 setMobileMenuOpen(false);
@@ -418,6 +430,7 @@ export default function Navbar() {
         </div>
       </header>
 
+      {/* FAQ Sidebar */}
       <div 
         className={`fixed inset-0 z-[60] transition-opacity duration-300 ${
           faqOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
