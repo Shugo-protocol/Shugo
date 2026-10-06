@@ -3,6 +3,7 @@ import { Space_Mono } from "next/font/google";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
 import { Providers } from "@/components/Providers";
+import Footer from "@/components/Footer";
 
 const spaceMono = Space_Mono({ 
   subsets: ["latin"],

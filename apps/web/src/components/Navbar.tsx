@@ -3,7 +3,12 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ArrowUpRight, ChevronDown, Menu, X, HelpCircle } from "lucide-react";
+import { 
+  ArrowUpRight, ChevronDown, Menu, X, HelpCircle,
+  BookOpen, Zap, Shield, Gauge, 
+  Terminal, Key, Eye, Ban, 
+  Cpu, Activity, Lock, ScrollText 
+} from "lucide-react";
 import ScrambleText from "./ScrambleText";
 import { ThemeToggle } from "./ThemeToggle";
 
@@ -29,27 +34,28 @@ interface MenuOption {
   desc: string;
   href: string;
   external?: boolean;
+  icon: React.ElementType; // Added icon property
 }
 
 const DOCS_ITEMS: MenuOption[] = [
-  { title: "introduction", desc: "zero-custody delegation protocol overview", href: "https://docs.shugo.com/introduction", external: true },
-  { title: "quickstart", desc: "deploy your first guardrail in under 5 minutes", href: "https://docs.shugo.com/quickstart", external: true },
-  { title: "zero-custody", desc: "solana subscriptions & allowances cpi mechanics", href: "https://docs.shugo.com/zero-custody", external: true },
-  { title: "velocity caps", desc: "epoch-based mathematical spend bounding", href: "https://docs.shugo.com/velocity-caps", external: true },
+  { title: "introduction", desc: "zero-custody delegation protocol overview", href: "https://docs.shugo.com/introduction", external: true, icon: BookOpen },
+  { title: "quickstart", desc: "deploy your first guardrail in under 5 minutes", href: "https://docs.shugo.com/quickstart", external: true, icon: Zap },
+  { title: "zero-custody", desc: "solana subscriptions & allowances cpi mechanics", href: "https://docs.shugo.com/zero-custody", external: true, icon: Shield },
+  { title: "velocity caps", desc: "epoch-based mathematical spend bounding", href: "https://docs.shugo.com/velocity-caps", external: true, icon: Gauge },
 ];
 
 const CLI_ITEMS: MenuOption[] = [
-  { title: "shugo init", desc: "scaffold local agent policy workspaces", href: "https://docs.shugo.com/quickstart", external: true },
-  { title: "shugo delegate", desc: "sign and broadcast on-chain allowance policy", href: "https://docs.shugo.com/quickstart", external: true },
-  { title: "shugo inspect", desc: "stream real-time spend accumulators and epochs", href: "https://docs.shugo.com/quickstart", external: true },
-  { title: "shugo revoke", desc: "instant emergency key revocation via single instruction", href: "https://docs.shugo.com/quickstart", external: true },
+  { title: "shugo init", desc: "scaffold local agent policy workspaces", href: "https://docs.shugo.com/quickstart", external: true, icon: Terminal },
+  { title: "shugo delegate", desc: "sign and broadcast on-chain allowance policy", href: "https://docs.shugo.com/quickstart", external: true, icon: Key },
+  { title: "shugo inspect", desc: "stream real-time spend accumulators and epochs", href: "https://docs.shugo.com/quickstart", external: true, icon: Eye },
+  { title: "shugo revoke", desc: "instant emergency key revocation via single instruction", href: "https://docs.shugo.com/quickstart", external: true, icon: Ban },
 ];
 
 const PROOFS_ITEMS: MenuOption[] = [
-  { title: "kani model checker", desc: "bounded verification runs eliminating panics & overflows", href: "/proofs#kani" },
-  { title: "velocity invariants", desc: "formal mathematical proof against balance exhaustion", href: "/proofs#velocity" },
-  { title: "revocation soundness", desc: "proof that revoked agent keys cannot sign or proxy cpis", href: "/proofs#revocation" },
-  { title: "verification logs", desc: "reproducible artifacts, harnesses, and test traces", href: "/proofs#logs" },
+  { title: "kani model checker", desc: "bounded verification runs eliminating panics & overflows", href: "/proofs#kani", icon: Cpu },
+  { title: "velocity invariants", desc: "formal mathematical proof against balance exhaustion", href: "/proofs#velocity", icon: Activity },
+  { title: "revocation soundness", desc: "proof that revoked agent keys cannot sign or proxy cpis", href: "/proofs#revocation", icon: Lock },
+  { title: "verification logs", desc: "reproducible artifacts, harnesses, and test traces", href: "/proofs#logs", icon: ScrollText },
 ];
 
 const FAQ_DATA = [
@@ -136,21 +142,27 @@ function DesktopDropdown({
               }}
             />
 
-            {items.map((item) => (
-              <Link 
-                key={item.title} 
-                href={item.href} 
-                target={item.external ? "_blank" : undefined} 
-                onMouseEnter={handleItemEnter}
-                className="p-2.5 rounded-lg border border-transparent transition-all flex flex-col justify-between group/card relative z-10"
-              >
-                <div className="flex items-center justify-between text-black dark:text-white font-medium mb-1">
-                  <span>{item.title}</span>
-                  <ArrowUpRight size={12} className="opacity-0 group-hover/card:opacity-100 transition-opacity text-zinc-400" />
-                </div>
-                <p className="text-zinc-500 dark:text-zinc-500 text-[11px] leading-relaxed">{item.desc}</p>
-              </Link>
-            ))}
+            {items.map((item) => {
+              const Icon = item.icon;
+              return (
+                <Link 
+                  key={item.title} 
+                  href={item.href} 
+                  target={item.external ? "_blank" : undefined} 
+                  onMouseEnter={handleItemEnter}
+                  className="p-2.5 rounded-lg border border-transparent transition-all flex flex-col justify-between group/card relative z-10 overflow-hidden"
+                >
+                  {/* Background Icon Hover Effect */}
+                  <Icon className="absolute -bottom-2 -right-2 w-16 h-16 text-black/[0.03] dark:text-white/[0.03] group-hover/card:scale-110 group-hover/card:-rotate-12 transition-transform duration-500 z-0 pointer-events-none" />
+
+                  <div className="flex items-center justify-between text-black dark:text-white font-medium mb-1 relative z-10">
+                    <span>{item.title}</span>
+                    <ArrowUpRight size={12} className="opacity-0 group-hover/card:opacity-100 transition-opacity text-zinc-400" />
+                  </div>
+                  <p className="text-zinc-500 dark:text-zinc-500 text-[11px] leading-relaxed relative z-10">{item.desc}</p>
+                </Link>
+              );
+            })}
           </div>
         </div>
       </div>
@@ -165,11 +177,9 @@ export default function Navbar() {
   const [isMounted, setIsMounted] = useState(false);
   const pathname = usePathname();
   
-  // RESTORED: Original state and ref for the gliding background hover pill
   const [hoveredRect, setHoveredRect] = useState({ left: 0, width: 0, opacity: 0 });
   const navRef = useRef<HTMLElement>(null);
 
-  // RESTORED: Original entrance animation timeout
   useEffect(() => {
     const timer = setTimeout(() => setIsMounted(true), 100);
     return () => clearTimeout(timer);
@@ -181,7 +191,6 @@ export default function Navbar() {
     setExpandedSection(null);
   }, [pathname]);
 
-  // Clean scroll locking
   useEffect(() => {
     if (mobileMenuOpen || faqOpen) {
       document.body.style.overflow = "hidden";
@@ -196,7 +205,6 @@ export default function Navbar() {
     setExpandedSection((prev) => (prev === section ? null : section));
   };
 
-  // RESTORED: Original getBoundingClientRect calculation
   const handleMouseEnter = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!navRef.current) return;
     const navRect = navRef.current.getBoundingClientRect();
@@ -211,7 +219,6 @@ export default function Navbar() {
 
   return (
     <>
-      {/* RESTORED: Original header classes for the entrance animation */}
       <header 
         className={`fixed top-0 left-0 right-0 z-40 font-mono text-sm lowercase bg-transparent transition-all duration-[800ms] ease-out ${
           isMounted ? "translate-y-0 opacity-100" : "-translate-y-8 opacity-0"
@@ -228,14 +235,12 @@ export default function Navbar() {
               </Link>
             </div>
 
-            {/* RESTORED: navRef applied here */}
             <nav 
               ref={navRef}
               onMouseLeave={() => setHoveredRect(prev => ({ ...prev, opacity: 0 }))}
               className="hidden lg:flex absolute left-1/2 -translate-x-1/2 items-center justify-center gap-1 xl:gap-2 z-10"
             >
               
-              {/* RESTORED: Original sliding pill logic based on 'left' property */}
               <div 
                 className="absolute top-1/2 -translate-y-1/2 h-9 bg-zinc-100/80 dark:bg-white/10 rounded-full transition-all duration-300 ease-out pointer-events-none z-0"
                 style={{ 
@@ -261,10 +266,6 @@ export default function Navbar() {
             </nav>
 
             <div className="flex items-center justify-end gap-1.5 sm:gap-2 z-10">
-              <div className="hover:bg-zinc-100/80 dark:hover:bg-white/10 rounded-full transition-all p-1 flex items-center justify-center">
-                <ThemeToggle />
-              </div>
-
               <Link 
                 className="hidden sm:flex text-zinc-500 dark:text-zinc-400 hover:text-black dark:hover:text-white hover:bg-zinc-100/80 dark:hover:bg-white/10 rounded-full transition-colors p-2" 
                 href="https://github.com/Shugo-protocol/Shugo" 
@@ -309,109 +310,50 @@ export default function Navbar() {
               <ArrowUpRight size={18} />
             </Link>
 
-            <div className="border border-zinc-200/80 dark:border-[#222] rounded-xl overflow-hidden bg-zinc-50/50 dark:bg-[#111]/50">
-              <button 
-                onClick={() => toggleSection("docs")} 
-                className="w-full min-h-[48px] flex items-center justify-between px-4 py-3 text-left font-medium text-black dark:text-white hover:bg-zinc-100/60 dark:hover:bg-white/5 active:bg-zinc-100 dark:active:bg-white/10 transition-colors"
-              >
-                <span className="text-sm">docs</span>
-                <ChevronDown size={16} className={`text-zinc-500 transition-transform duration-200 ${expandedSection === "docs" ? "rotate-180 text-black dark:text-white" : ""}`} />
-              </button>
-              <div 
-                className={`grid transition-all duration-200 ease-in-out ${
-                  expandedSection === "docs" ? "grid-rows-[1fr] opacity-100 border-t border-zinc-200 dark:border-[#222]" : "grid-rows-[0fr] opacity-0"
-                }`}
-              >
-                <div className="overflow-hidden">
-                  <div className="p-2.5 grid grid-cols-1 sm:grid-cols-2 gap-2 bg-white/60 dark:bg-[#0A0A0A]/60">
-                    {DOCS_ITEMS.map((item) => (
-                      <Link 
-                        key={item.title} 
-                        href={item.href} 
-                        target={item.external ? "_blank" : undefined}
-                        onClick={() => setMobileMenuOpen(false)}
-                        className="p-3 rounded-lg bg-white dark:bg-[#121212] border border-zinc-200 dark:border-[#222] active:border-zinc-400 dark:active:border-zinc-600 transition-all flex flex-col justify-between"
-                      >
-                        <div className="flex items-center justify-between font-medium text-black dark:text-white text-xs mb-1">
-                          <span>{item.title}</span>
-                          <ArrowUpRight size={13} className="text-zinc-400" />
-                        </div>
-                        <p className="text-[11px] text-zinc-500 dark:text-zinc-400 leading-snug">{item.desc}</p>
-                      </Link>
-                    ))}
+            {[
+              { id: "docs", label: "docs", items: DOCS_ITEMS },
+              { id: "cli", label: "cli", items: CLI_ITEMS },
+              { id: "proofs", label: "proofs", items: PROOFS_ITEMS }
+            ].map((section) => (
+              <div key={section.id} className="border border-zinc-200/80 dark:border-[#222] rounded-xl overflow-hidden bg-zinc-50/50 dark:bg-[#111]/50">
+                <button 
+                  onClick={() => toggleSection(section.id)} 
+                  className="w-full min-h-[48px] flex items-center justify-between px-4 py-3 text-left font-medium text-black dark:text-white hover:bg-zinc-100/60 dark:hover:bg-white/5 active:bg-zinc-100 dark:active:bg-white/10 transition-colors"
+                >
+                  <span className="text-sm">{section.label}</span>
+                  <ChevronDown size={16} className={`text-zinc-500 transition-transform duration-200 ${expandedSection === section.id ? "rotate-180 text-black dark:text-white" : ""}`} />
+                </button>
+                <div 
+                  className={`grid transition-all duration-200 ease-in-out ${
+                    expandedSection === section.id ? "grid-rows-[1fr] opacity-100 border-t border-zinc-200 dark:border-[#222]" : "grid-rows-[0fr] opacity-0"
+                  }`}
+                >
+                  <div className="overflow-hidden">
+                    <div className="p-2.5 grid grid-cols-1 sm:grid-cols-2 gap-2 bg-white/60 dark:bg-[#0A0A0A]/60">
+                      {section.items.map((item) => {
+                        const Icon = item.icon;
+                        return (
+                          <Link 
+                            key={item.title} 
+                            href={item.href} 
+                            target={item.external ? "_blank" : undefined}
+                            onClick={() => setMobileMenuOpen(false)}
+                            className="group/mobile relative overflow-hidden p-3 rounded-lg bg-white dark:bg-[#121212] border border-zinc-200 dark:border-[#222] active:border-zinc-400 dark:active:border-zinc-600 transition-all flex flex-col justify-between"
+                          >
+                            <Icon className="absolute -bottom-2 -right-2 w-14 h-14 text-black/[0.03] dark:text-white/[0.03] group-hover/mobile:scale-110 group-hover/mobile:-rotate-12 transition-transform duration-500 z-0 pointer-events-none" />
+                            <div className="flex items-center justify-between font-medium text-black dark:text-white text-xs mb-1 relative z-10">
+                              <span>{item.title}</span>
+                              <ArrowUpRight size={13} className="text-zinc-400" />
+                            </div>
+                            <p className="text-[11px] text-zinc-500 dark:text-zinc-400 leading-snug relative z-10">{item.desc}</p>
+                          </Link>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-
-            <div className="border border-zinc-200/80 dark:border-[#222] rounded-xl overflow-hidden bg-zinc-50/50 dark:bg-[#111]/50">
-              <button 
-                onClick={() => toggleSection("cli")} 
-                className="w-full min-h-[48px] flex items-center justify-between px-4 py-3 text-left font-medium text-black dark:text-white hover:bg-zinc-100/60 dark:hover:bg-white/5 active:bg-zinc-100 dark:active:bg-white/10 transition-colors"
-              >
-                <span className="text-sm">cli</span>
-                <ChevronDown size={16} className={`text-zinc-500 transition-transform duration-200 ${expandedSection === "cli" ? "rotate-180 text-black dark:text-white" : ""}`} />
-              </button>
-              <div 
-                className={`grid transition-all duration-200 ease-in-out ${
-                  expandedSection === "cli" ? "grid-rows-[1fr] opacity-100 border-t border-zinc-200 dark:border-[#222]" : "grid-rows-[0fr] opacity-0"
-                }`}
-              >
-                <div className="overflow-hidden">
-                  <div className="p-2.5 grid grid-cols-1 sm:grid-cols-2 gap-2 bg-white/60 dark:bg-[#0A0A0A]/60">
-                    {CLI_ITEMS.map((item) => (
-                      <Link 
-                        key={item.title} 
-                        href={item.href} 
-                        target={item.external ? "_blank" : undefined}
-                        onClick={() => setMobileMenuOpen(false)}
-                        className="p-3 rounded-lg bg-white dark:bg-[#121212] border border-zinc-200 dark:border-[#222] active:border-zinc-400 dark:active:border-zinc-600 transition-all flex flex-col justify-between"
-                      >
-                        <div className="flex items-center justify-between font-medium text-black dark:text-white text-xs mb-1">
-                          <span>{item.title}</span>
-                          <ArrowUpRight size={13} className="text-zinc-400" />
-                        </div>
-                        <p className="text-[11px] text-zinc-500 dark:text-zinc-400 leading-snug">{item.desc}</p>
-                      </Link>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="border border-zinc-200/80 dark:border-[#222] rounded-xl overflow-hidden bg-zinc-50/50 dark:bg-[#111]/50">
-              <button 
-                onClick={() => toggleSection("proofs")} 
-                className="w-full min-h-[48px] flex items-center justify-between px-4 py-3 text-left font-medium text-black dark:text-white hover:bg-zinc-100/60 dark:hover:bg-white/5 active:bg-zinc-100 dark:active:bg-white/10 transition-colors"
-              >
-                <span className="text-sm">proofs</span>
-                <ChevronDown size={16} className={`text-zinc-500 transition-transform duration-200 ${expandedSection === "proofs" ? "rotate-180 text-black dark:text-white" : ""}`} />
-              </button>
-              <div 
-                className={`grid transition-all duration-200 ease-in-out ${
-                  expandedSection === "proofs" ? "grid-rows-[1fr] opacity-100 border-t border-zinc-200 dark:border-[#222]" : "grid-rows-[0fr] opacity-0"
-                }`}
-              >
-                <div className="overflow-hidden">
-                  <div className="p-2.5 grid grid-cols-1 sm:grid-cols-2 gap-2 bg-white/60 dark:bg-[#0A0A0A]/60">
-                    {PROOFS_ITEMS.map((item) => (
-                      <Link 
-                        key={item.title} 
-                        href={item.href}
-                        onClick={() => setMobileMenuOpen(false)}
-                        className="p-3 rounded-lg bg-white dark:bg-[#121212] border border-zinc-200 dark:border-[#222] active:border-zinc-400 dark:active:border-zinc-600 transition-all flex flex-col justify-between"
-                      >
-                        <div className="flex items-center justify-between font-medium text-black dark:text-white text-xs mb-1">
-                          <span>{item.title}</span>
-                          <ArrowUpRight size={13} className="text-zinc-400" />
-                        </div>
-                        <p className="text-[11px] text-zinc-500 dark:text-zinc-400 leading-snug">{item.desc}</p>
-                      </Link>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
+            ))}
 
             <button 
               onClick={() => {
