@@ -5,7 +5,8 @@ import { useState, useEffect } from "react";
 import { MapPin, ArrowUpRight, FileText, ShieldCheck, X, Sun, Moon } from "lucide-react";
 
 export default function Footer() {
-  const [activeModal, setActiveModal] = useState(null); // 'terms' | 'privacy' | null
+  // Added TypeScript generic <'terms' | 'privacy' | null> here to fix the build errors
+  const [activeModal, setActiveModal] = useState<'terms' | 'privacy' | null>(null); 
   const [isDarkMode, setIsDarkMode] = useState(false);
 
   // Check initial theme on mount
