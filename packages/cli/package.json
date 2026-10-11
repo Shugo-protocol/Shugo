@@ -1,5 +1,5 @@
 {
-  "name": "@shugo/cli",
+  "name": "@shugo-protocol/cli",
   "version": "0.1.0",
   "description": "CLI for Shugo — a policy guardrail layer for Solana's Subscriptions & Allowances program.",
   "license": "MIT",
@@ -11,7 +11,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@shugo/sdk": "workspace:*",
+    "@shugo-protocol/sdk": "workspace:*", 
     "@solana/web3.js": "^1.95.0",
     "commander": "^12.1.0"
   },

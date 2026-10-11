@@ -1,7 +1,7 @@
 import type { Command } from "commander";
 import { PublicKey } from "@solana/web3.js";
 
-import { activeDestinations, decodePolicy } from "@shugo/sdk";
+import { activeDestinations, decodePolicy } from "@shugo-protocol/sdk";
 
 import { createConnection } from "../config.js";
 import { fetchMintDecimals, toUiAmount } from "../format.js";

@@ -1,7 +1,7 @@
 import type { Command } from "commander";
 import { PublicKey, Transaction, sendAndConfirmTransaction } from "@solana/web3.js";
 
-import { buildUpdatePolicyInstruction, decodePolicy } from "@shugo/sdk";
+import { buildUpdatePolicyInstruction, decodePolicy } from "@shugo-protocol/sdk";
 
 import { DEFAULT_KEYPAIR_PATH, createConnection, loadKeypair } from "../config.js";
 import { fetchMintDecimals, toBaseUnits } from "../format.js";

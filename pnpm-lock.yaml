@@ -91,7 +91,7 @@ importers:
 
   packages/cli:
     dependencies:
-      '@shugo/sdk':
+      '@shugo-protocol/sdk':
         specifier: workspace:*
         version: link:../sdk
       '@solana/web3.js':
