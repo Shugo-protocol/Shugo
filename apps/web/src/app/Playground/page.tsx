@@ -2,13 +2,15 @@
 
 import { Buffer } from "buffer";
 
-// --- THE NUCLEAR BUFFER PATCH ---
+// --- THE NUCLEAR BUFFER PATCH (ES5 TypeScript Safe) ---
 if (typeof window !== "undefined" && typeof Uint8Array !== "undefined") {
   const U8P = Uint8Array.prototype as any;
   if (!U8P.writeBigUInt64LE) {
     U8P.writeBigUInt64LE = function (value: bigint, offset = 0) {
-      const lo = Number(value & 0xffffffffn);
-      const hi = Number((value >> 32n) & 0xffffffffn);
+      const _32 = BigInt(32);
+      const _mask = BigInt(0xffffffff);
+      const lo = Number(value & _mask);
+      const hi = Number((value >> _32) & _mask);
       this[offset] = lo; this[offset + 1] = lo >> 8; this[offset + 2] = lo >> 16; this[offset + 3] = lo >>> 24;
       this[offset + 4] = hi; this[offset + 5] = hi >> 8; this[offset + 6] = hi >> 16; this[offset + 7] = hi >>> 24;
       return offset + 8;
@@ -17,21 +19,22 @@ if (typeof window !== "undefined" && typeof Uint8Array !== "undefined") {
   if (!U8P.writeBigInt64LE) U8P.writeBigInt64LE = U8P.writeBigUInt64LE;
   if (!U8P.readBigUInt64LE) {
     U8P.readBigUInt64LE = function (offset = 0) {
+      const _32 = BigInt(32);
       const lo = this[offset] | (this[offset+1]<<8) | (this[offset+2]<<16) | (this[offset+3]*0x1000000);
       const hi = this[offset+4] | (this[offset+5]<<8) | (this[offset+6]<<16) | (this[offset+7]*0x1000000);
-      return BigInt(lo >>> 0) + (BigInt(hi >>> 0) << 32n);
+      return BigInt(lo >>> 0) + (BigInt(hi >>> 0) << _32);
     };
   }
   if (!U8P.readBigInt64LE) {
     U8P.readBigInt64LE = function (offset = 0) {
+      const _32 = BigInt(32);
       const lo = this[offset] | (this[offset+1]<<8) | (this[offset+2]<<16) | (this[offset+3]*0x1000000);
       const hi = this[offset+4] | (this[offset+5]<<8) | (this[offset+6]<<16) | (this[offset+7]<<24);
-      return BigInt(lo >>> 0) + (BigInt(hi) << 32n);
+      return BigInt(lo >>> 0) + (BigInt(hi) << _32);
     };
   }
   import("buffer").then(({ Buffer }) => { window.Buffer = window.Buffer || Buffer; });
 }
-// --------------------------------
 
 import { useState, useEffect } from "react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
