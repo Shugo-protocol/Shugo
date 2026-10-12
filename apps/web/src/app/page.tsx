@@ -319,7 +319,7 @@ export default function Home() {
               <div className="flex items-center justify-between border border-zinc-300 dark:border-zinc-700 bg-[#FAFAFA] dark:bg-[#111111] px-4 py-3 flex-1 w-full h-[50px] shadow-sm rounded-lg">
                 <div className="flex items-center gap-3 font-mono text-sm sm:text-base text-zinc-700 dark:text-zinc-300">
                   <span className="text-zinc-400 select-none">$</span>
-                  <code>npx shugo init</code>
+                  <code>npm i @shugo-protocol/cli</code>
                 </div>
                 <button onClick={handleCopy} className="text-zinc-400 hover:text-black dark:hover:text-white transition-colors p-1">
                   {copied ? <Check size={18} className="text-green-500" /> : <Copy size={18} />}
@@ -327,7 +327,7 @@ export default function Home() {
               </div>
 
               {/* Read the Docs Button - Background Logo Sized Down to Prevent Cutting */}
-              <Link href="https://docs.shugo.com" className="w-full sm:w-auto h-[50px]">
+              <Link href="https://docs.shugo.website" className="w-full sm:w-auto h-[50px]">
                 <button className="relative w-full sm:w-auto bg-[#EAEAEA] dark:bg-[#EDEDED] text-black px-6 font-bold hover:bg-[#D4D4D4] dark:hover:bg-white active:scale-95 transition-all flex items-center justify-center gap-2.5 text-sm sm:text-base h-full whitespace-nowrap rounded-lg group overflow-hidden z-0 border border-transparent">
                   
                   {/* Background Icon - Fits Perfectly within the button now */}

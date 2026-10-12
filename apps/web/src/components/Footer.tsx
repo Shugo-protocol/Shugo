@@ -2,34 +2,30 @@
 
 import Link from "next/link";
 import { useState, useEffect } from "react";
+import { useTheme } from "next-themes";
 import { MapPin, ArrowUpRight, FileText, ShieldCheck, X, Sun, Moon } from "lucide-react";
 
 export default function Footer() {
-  // Added TypeScript generic <'terms' | 'privacy' | null> here to fix the build errors
   const [activeModal, setActiveModal] = useState<'terms' | 'privacy' | null>(null); 
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  
+  // 1. Use next-themes instead of manual state/DOM manipulation
+  const { theme, setTheme, resolvedTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
 
-  // Check initial theme on mount
+  // 2. Prevent hydration mismatch on initial load
   useEffect(() => {
-    if (document.documentElement.classList.contains("dark")) {
-      setIsDarkMode(true);
-    }
+    setMounted(true);
   }, []);
 
   const toggleTheme = () => {
-    setIsDarkMode(!isDarkMode);
-    if (document.documentElement.classList.contains("dark")) {
-      document.documentElement.classList.remove("dark");
-    } else {
-      document.documentElement.classList.add("dark");
-    }
+    // 3. Update theme globally via next-themes
+    setTheme(resolvedTheme === "dark" ? "light" : "dark");
   };
 
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  // Mock content for the modals
   const modalContent = {
     terms: {
       title: "Terms of Service",
@@ -73,7 +69,6 @@ export default function Footer() {
             help us to improve.
           </h3>
           
-          {/* GitHub Organization Card placed directly in layout */}
           <Link
             href="https://github.com/Shugo-protocol"
             target="_blank"
@@ -81,12 +76,10 @@ export default function Footer() {
             className="group block w-full max-w-[380px] bg-white border border-zinc-200/90 hover:border-zinc-300 rounded-2xl p-5 shadow-[0_10px_30px_rgba(0,0,0,0.06)] hover:shadow-[0_16px_40px_rgba(0,0,0,0.1)] transition-all duration-200 hover:-translate-y-0.5 normal-case"
           >
             <div className="flex gap-4 items-start">
-              {/* Avatar Box */}
               <div className="w-14 h-14 shrink-0 bg-[#F6F8FA] border border-zinc-200 rounded-xl flex items-center justify-center font-bold text-black text-sm tracking-tight shadow-inner font-sans">
                 Shugo
               </div>
               
-              {/* Profile Details */}
               <div className="flex flex-col min-w-0 flex-1">
                 <div className="flex items-center justify-between">
                   <h4 className="text-[17px] font-bold text-zinc-900 leading-snug group-hover:text-black transition-colors font-sans">
@@ -99,14 +92,11 @@ export default function Footer() {
                   shugo: on-chain guardrails for ai agents on solana
                 </p>
                 
-                {/* Metadata Row */}
                 <div className="flex flex-wrap items-center gap-x-3.5 gap-y-1.5 mt-3.5 text-[12px] text-zinc-500 font-sans">
-                  
                   <div className="flex items-center gap-1">
                     <MapPin size={13} className="text-zinc-400" />
                     <span>India</span>
                   </div>
-                  
                   <div className="flex items-center gap-1">
                     <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" className="text-zinc-500">
                       <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
@@ -119,32 +109,21 @@ export default function Footer() {
           </Link>
         </div>
 
-        {/* Links Grid: Developers, Resources, Socials */}
+        {/* Links Grid */}
         <div className="w-full grid grid-cols-2 sm:grid-cols-3 gap-x-8 gap-y-10 lg:ml-auto normal-case max-w-2xl">
           <div className="flex flex-col gap-3 md:gap-4">
             <h4 className="text-zinc-400 dark:text-zinc-500 mb-1 font-medium text-xs uppercase tracking-wider">Developers</h4>
-            <Link href="https://docs.shugo.com" className="hover:text-black dark:hover:text-white transition-colors text-sm text-zinc-600 dark:text-zinc-400">Documentation</Link>
+            <Link href="https://docs.shugo.website" className="hover:text-black dark:hover:text-white transition-colors text-sm text-zinc-600 dark:text-zinc-400">Documentation</Link>
             <Link href="https://github.com/Shugo-protocol" target="_blank" rel="noopener noreferrer" className="hover:text-black dark:hover:text-white transition-colors text-sm text-zinc-600 dark:text-zinc-400">GitHub</Link>
-            <Link href="#" className="hover:text-black dark:hover:text-white transition-colors text-sm text-zinc-600 dark:text-zinc-400">NPM Registry</Link>
+            <Link href="https://www.npmjs.com/package/@shugo-protocol/sdk" target="_blank" rel="noopener noreferrer" className="hover:text-black dark:hover:text-white transition-colors text-sm text-zinc-600 dark:text-zinc-400">NPM Registry (sdk)</Link>
+            <Link href="https://www.npmjs.com/package/@shugo-protocol/cli" target="_blank" rel="noopener noreferrer" className="hover:text-black dark:hover:text-white transition-colors text-sm text-zinc-600 dark:text-zinc-400">NPM Registry (cli)</Link>
           </div>
           
-          <div className="flex flex-col gap-3 md:gap-4">
-            <h4 className="text-zinc-400 dark:text-zinc-500 mb-1 font-medium text-xs uppercase tracking-wider">Resources</h4>
-            <Link href="#" className="hover:text-black dark:hover:text-white transition-colors text-sm text-zinc-600 dark:text-zinc-400">Security Audits</Link>
-            <Link href="#" className="hover:text-black dark:hover:text-white transition-colors text-sm text-zinc-600 dark:text-zinc-400">Network Status</Link>
-            <Link href="#" className="hover:text-black dark:hover:text-white transition-colors text-sm text-zinc-600 dark:text-zinc-400">Blog</Link>
-          </div>
+          
           
           <div className="flex flex-col gap-3 md:gap-4">
             <h4 className="text-zinc-400 dark:text-zinc-500 mb-1 font-medium text-xs uppercase tracking-wider">Socials</h4>
-            <Link 
-              href="https://x.com/ShugoProtocol" 
-              target="_blank" 
-              rel="noopener noreferrer" 
-              className="hover:text-black dark:hover:text-white transition-colors text-sm text-zinc-600 dark:text-zinc-400"
-            >
-              X (Twitter)
-            </Link>
+            <Link href="https://x.com/ShugoProtocol" target="_blank" rel="noopener noreferrer" className="hover:text-black dark:hover:text-white transition-colors text-sm text-zinc-600 dark:text-zinc-400">X (Twitter)</Link>
           </div>
         </div>
       </div>
@@ -156,35 +135,28 @@ export default function Footer() {
         <div className="flex flex-wrap justify-center lg:justify-start items-center gap-4 sm:gap-6 text-xs sm:text-sm text-zinc-500 dark:text-zinc-400">
           <span>© Shugo Inc. 2026</span>
           
-          {/* Terms of Service Button with Icon */}
-          <button 
-            onClick={() => setActiveModal('terms')}
-            className="flex items-center gap-1.5 hover:text-black dark:hover:text-white transition-colors"
-          >
+          <button onClick={() => setActiveModal('terms')} className="flex items-center gap-1.5 hover:text-black dark:hover:text-white transition-colors">
             <FileText size={14} className="opacity-70" />
             <span>Terms of service</span>
           </button>
           
-          {/* Privacy Policy Button with Icon */}
-          <button 
-            onClick={() => setActiveModal('privacy')}
-            className="flex items-center gap-1.5 hover:text-black dark:hover:text-white transition-colors"
-          >
+          <button onClick={() => setActiveModal('privacy')} className="flex items-center gap-1.5 hover:text-black dark:hover:text-white transition-colors">
             <ShieldCheck size={14} className="opacity-70" />
             <span>Privacy policy</span>
           </button>
         </div>
         
-        {/* Actions Group: Theme + Scroll to Top */}
+        {/* Actions Group */}
         <div className="flex items-center gap-3 w-full lg:w-auto justify-center">
           
-          {/* Theme Toggle Button */}
+          {/* Universal Theme Toggle Button */}
           <button 
             onClick={toggleTheme}
             className="p-2 sm:px-3 sm:py-2 rounded-full border border-zinc-200 dark:border-[#222] bg-[#FAFAFA] dark:bg-[#111111] hover:bg-zinc-100 dark:hover:bg-[#1A1A1A] transition-colors text-xs sm:text-sm flex items-center gap-2 text-zinc-600 dark:text-zinc-400 group"
             aria-label="Toggle theme"
           >
-            {isDarkMode ? <Moon size={16} /> : <Sun size={16} />}
+             {/* Use mounted to prevent hydration errors */}
+            {mounted && resolvedTheme === "dark" ? <Moon size={16} /> : <Sun size={16} />}
           </button>
 
           {/* Scroll To Top */}
@@ -196,7 +168,6 @@ export default function Footer() {
             <span className="group-hover:-translate-y-0.5 transition-transform">↑</span>
           </button>
         </div>
-
       </div>
 
       {/* Background Japanese Watermark */}
@@ -209,13 +180,9 @@ export default function Footer() {
       {/* Centered Modal Overlay */}
       {activeModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/40 backdrop-blur-sm normal-case font-sans">
-          {/* Overlay background click to close */}
           <div className="absolute inset-0" onClick={() => setActiveModal(null)} />
-          
-          {/* Modal Content Box */}
           <div className="relative w-full max-w-2xl max-h-[85vh] bg-white dark:bg-[#111111] border border-zinc-200 dark:border-[#222] rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
             
-            {/* Modal Header */}
             <div className="flex items-center justify-between p-5 border-b border-zinc-200 dark:border-[#222]">
               <h2 className="text-lg font-semibold text-black dark:text-white flex items-center gap-2">
                 {activeModal === 'terms' ? <FileText size={18} /> : <ShieldCheck size={18} />}
@@ -230,12 +197,10 @@ export default function Footer() {
               </button>
             </div>
             
-            {/* Modal Body (Scrollable) */}
             <div className="p-6 overflow-y-auto overscroll-contain">
               {modalContent[activeModal].body}
             </div>
             
-            {/* Modal Footer */}
             <div className="p-4 border-t border-zinc-200 dark:border-[#222] flex justify-end">
               <button 
                 onClick={() => setActiveModal(null)}
