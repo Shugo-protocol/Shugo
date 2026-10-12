@@ -430,7 +430,7 @@ export default function Navbar() {
               />
               <DesktopDropdown
                 label="proofs"
-                mainHref="/proofs"
+                mainHref="https://docs.shugo.website/proofs"
                 items={PROOFS_ITEMS}
                 onMouseEnter={handleMouseEnter}
               />

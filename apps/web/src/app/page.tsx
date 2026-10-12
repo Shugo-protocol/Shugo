@@ -365,13 +365,14 @@ export default function Home() {
         <Reveal className="w-full z-10 mb-24">
           <div className="w-full max-w-[90rem] px-4 md:px-12 mx-auto">
             <div className="flex flex-col items-center w-full max-w-5xl mx-auto">
-              <div className="w-full aspect-video max-h-[600px] bg-[#FAFAFA] dark:bg-[#111111] border border-zinc-200 dark:border-[#222] rounded-lg overflow-hidden transition-colors relative flex items-center justify-center shadow-2xl">
-                <div className="absolute top-2 left-2 sm:top-4 sm:left-4 text-[10px] sm:text-xs font-bold bg-white dark:bg-black text-black dark:text-white px-2 py-1 border border-zinc-200 dark:border-[#222] rounded-md z-10 shadow-sm">
-                  shugo_demo.mp4
-                </div>
-                <div className="w-12 h-12 sm:w-20 sm:h-20 bg-black dark:bg-white rounded-full flex items-center justify-center hover:scale-110 active:scale-95 transition-all cursor-pointer shadow-lg group z-10">
-                  <div className="w-0 h-0 border-t-[8px] sm:border-t-[12px] border-t-transparent border-l-[14px] sm:border-l-[20px] border-l-white dark:border-l-black border-b-[8px] sm:border-b-[12px] border-b-transparent ml-1 sm:ml-2 group-hover:scale-110 transition-transform" />
-                </div>
+              {/* Added the iframe inside the existing video container, stripping out the dummy play button and text */}
+              <div className="w-full aspect-video max-h-[600px] bg-[#FAFAFA] dark:bg-[#111111] border border-zinc-200 dark:border-[#222] rounded-lg overflow-hidden transition-colors relative shadow-2xl">
+                <iframe 
+                  src="https://www.loom.com/embed/8cbd11e15a6e462da4c1567cafe395bb"
+                  frameBorder="0"
+                  allowFullScreen
+                  className="absolute top-0 left-0 w-full h-full"
+                ></iframe>
               </div>
             </div>
           </div>
