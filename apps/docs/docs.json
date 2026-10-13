@@ -1,10 +1,10 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "theme": "luma",
+  "theme": "sequoia",
   "name": "shugo",
   "logo": {
-    "dark": "/shugo-wordmark-dark.png",
-    "light": "/shugo-wordmark-light.png"
+    "dark": "/apps/docs/images/Shugo(1)(1).png",
+    "light": "/apps/docs/images/Shugo(2)(1).png"
   },
   "favicon": "/favicon.svg",
   "colors": {
@@ -71,9 +71,16 @@
     }
   },
   "icons": {
-    "library": "tabler"
+    "library": "lucide"
   },
   "background": {
-    "image": "/apps/docs/images/Shugo(2).png"
+    "image": {
+      "light": "/apps/docs/images/Screenshot_20261013_054133.png",
+      "dark": "/apps/docs/images/Screenshot_20261013_054208.png"
+    },
+    "decoration": "grid"
+  },
+  "appearance": {
+    "default": "light"
   }
 }
