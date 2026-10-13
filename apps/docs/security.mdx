@@ -1,0 +1,137 @@
+---
+title: "Security"
+description: "What has been proven about Shugo, what hasn't, and what you're trusting when you use it."
+---
+
+A policy layer is only worth using if you know exactly where its guarantees stop. This page is deliberately specific about both sides.
+
+<Warning>
+  **Shugo has not been audited by a third party, and it is deployed on devnet only.** The Subscriptions & Allowances program it builds on was audited by Cantina; Shugo's own program has not been. Treat it as hackathon-stage software, not something to put real funds behind.
+</Warning>
+
+## What was proven: the decision logic
+
+The core of Shugo is one pure function, `evaluate()`, that takes a snapshot of a policy plus a requested pull and returns `Allow` or `Deny(reason)`. It has no accounts, no CPI, and no Solana runtime in it, which is what makes it possible to check exhaustively with [Kani](https://github.com/model-checking/kani), a bit-precise model checker for Rust.
+
+The property proven is a biconditional: `evaluate() `**returns** `Allow `**if and only if every check passes.**
+
+```text
+Allow  ⟺  !paused
+        ∧ amount ≤ per_call_cap
+        ∧ window_total + amount does not overflow
+        ∧ window_total + amount ≤ velocity_cap
+        ∧ destination ∈ allowlist[0..destination_count]
+```
+
+Both directions matter. "Allow implies every check passed" means nothing slips through. "Every check passed implies Allow" means the function can't wrongly deny a valid pull either. The proof runs over **every** possible value of every input — all `u64` caps and amounts, all `i64` timestamps, all possible destination bytes — not a sampled set of test cases.
+
+```text Result
+SUMMARY:
+ ** 0 of 483 failed (10 unreachable)
+
+VERIFICATION:- SUCCESSFUL
+Verification Time: 8.819668s
+```
+
+The harness restates the specification independently of the implementation and asserts the two agree. Abridged:
+
+```rust
+#[cfg(kani)]
+#[kani::proof]
+fn evaluate_correctness() {
+    // Every input is symbolic: Kani explores all possible values.
+    let paused: bool = kani::any();
+    let per_call_cap: u64 = kani::any();
+    let velocity_cap: u64 = kani::any();
+    let window_start_ts: i64 = kani::any();
+    let velocity_window_s: i64 = kani::any();
+    let window_pulled: u64 = kani::any();
+    let now: i64 = kani::any();
+    let amount: u64 = kani::any();
+    // ... destination_count, the four allowlist entries, and destination ...
+
+    // The specification, written separately from evaluate():
+    let window_reset = now >= window_start_ts.saturating_add(velocity_window_s);
+    let pulled_before = if window_reset { 0 } else { window_pulled };
+    let sum_ok = pulled_before.checked_add(amount).is_some();
+    let new_pulled = pulled_before.checked_add(amount).unwrap_or(u64::MAX);
+    let should_allow = !paused
+        && amount <= per_call_cap
+        && sum_ok
+        && new_pulled <= velocity_cap
+        && dest_ok;
+
+    match evaluate(&policy, now, amount, destination) {
+        Decision::Allow { .. } => assert!(should_allow),
+        Decision::Deny(_) => assert!(!should_allow),
+    }
+}
+```
+
+To reproduce it yourself:
+
+```bash
+cargo install --locked kani-verifier && cargo kani setup
+cd programs/guard && cargo kani
+```
+
+## What the proof does not cover
+
+These limits are as important as the result.
+
+<AccordionGroup>
+  <Accordion title="It does not prove 'no more than the cap in any window-length interval'">
+    That property is false for Shugo and is not claimed. The window is fixed, not sliding, so an agent can pull up to the cap at the end of one window and again at the start of the next — up to 2× the cap across a boundary. See [Velocity Caps](/velocity-caps#fixed-windows-allow-a-boundary-burst).
+  </Accordion>
+
+  <Accordion title="It covers evaluate(), not the whole program">
+    The proof covers the decision function. It does not cover account validation in `execute_pull`, the CPI into S&A, the write-back of the updated window total, PDA derivation, or signer checks. Those are exercised by the integration tests below, which are behavioral checks of specific scenarios, not exhaustive proofs.
+  </Accordion>
+
+  <Accordion title="The proof checks the code against a specification the same author wrote">
+    If the specification itself encodes a wrong idea of what should be allowed, the proof will faithfully confirm the code matches that wrong idea. It rules out implementation bugs relative to the spec, not mistakes in the spec. Review the five conditions above as the actual policy you're agreeing to.
+  </Accordion>
+
+  <Accordion title="It says nothing about S&A or the Solana runtime">
+    Both are assumed correct. S&A has its own audit; Shugo inherits its guarantees and its risks.
+  </Accordion>
+</AccordionGroup>
+
+## Integration tests
+
+Seven tests run both compiled programs side by side in [LiteSVM](https://github.com/LiteSVM/litesvm) — Shugo's program and the real, unmodified Subscriptions & Allowances binary — so the CPI between them executes under real runtime semantics rather than being mocked.
+
+| Test | Establishes |
+| --- | --- |
+| `policy_pda_pulls_real_tokens_through_a_real_delegation` | The whole architecture: a Policy PDA registered as `delegatee` can pull real token balances through a real S&A delegation. |
+| `execute_pull_denies_a_destination_not_on_the_allowlist` | Redirecting a pull to a non-allowlisted account is denied — a move S&A alone allows. |
+| `execute_pull_denies_amount_over_per_call_cap` | The per-call cap holds. |
+| `execute_pull_enforces_velocity_cap_across_two_pulls` | The window cap holds, and the window resets after it expires. |
+| `execute_pull_denies_when_paused` | The kill switch blocks pulls. |
+| `execute_pull_denies_a_signer_who_is_not_the_registered_agent` | Only the registered agent can pull. |
+| `update_policy_changes_take_effect_on_the_next_pull` | Policy changes apply to the very next pull. |
+
+```bash
+anchor build
+cargo test --manifest-path tests/guard-litesvm/Cargo.toml
+```
+
+The suite also needs the S&A program built as a sibling checkout (or `SUBSCRIPTIONS_SO_PATH` pointing at its `.so`).
+
+### A bug the tests missed once
+
+The first devnet `create-policy` run failed with S&A error 136, `StaleSubscriptionAuthority`. The SDK had passed a hardcoded `0` as the authority's generation ID. A real authority's ID is the slot it was created in, so on a live cluster that value is huge; every test had passed anyway because LiteSVM's clock starts at slot 0, which made the wrong value accidentally correct. The SDK now uses S&A's sentinel for same-transaction creation, and the test suite sets a realistic slot so this class of bug can't hide again. It's listed here because a security page that only reports successes isn't worth much.
+
+## What you're trusting
+
+| You trust | Why it matters |
+| --- | --- |
+| **The human's key** | The human can change the policy, swap the agent, and widen the caps. A compromised human key defeats every guarantee here. Shugo bounds a bad _agent_, not a bad _owner_. |
+| **The allowlist entries** | The allowlist pins where funds may go; it can't tell whether the destination itself is trustworthy. A compromised merchant account is still on the list. |
+| **The program's upgrade authority** | The devnet program is upgradeable by a single developer key. Whoever holds it could change program behavior. Before any mainnet use it should move to a multisig or be revoked. |
+| **S&A** | Shugo never moves tokens itself; S&A does. A bug there is outside this proof. |
+| **The mint** | Only plain mints are supported today. Token-2022 mints with transfer hooks aren't — see the [FAQ](/faq). |
+
+## Reporting an issue
+
+Open an issue on [GitHub](https://github.com/shugo-protocol/shugo). For anything you believe is exploitable, please contact the maintainers privately before posting details publicly.

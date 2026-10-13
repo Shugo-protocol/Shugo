@@ -1,0 +1,192 @@
+---
+title: "CLI Reference"
+---
+
+Every shugo command, with the flags it actually takes.
+
+The `shugo` CLI is a thin wrapper over [`@shugo-protocol/sdk`](/sdk-reference): each command builds a transaction with the SDK, signs it with the keypair you specify, and submits it. For a guided walkthrough with example output, start with the [Quickstart](/quickstart).
+
+## Installation
+
+Install the CLI package and its Solana dependencies using your package manager:
+
+```bash npm
+npm install @shugo-protocol/cli @solana/web3.js
+```
+
+The package provides the `shugo` command. If your package manager does not expose it on your shell path, run it through the package manager's executable runner or check that your package's binary directory is on `PATH`.
+
+## Who signs what
+
+Shugo has two signing roles, and mixing them up is a common mistake. Every command that sends a transaction takes `--keypair`, and it must be the right party's key.
+
+| Role | Commands | Why |
+| --- | --- | --- |
+| **Human** (the policy owner) | `create-policy`, `pause`, `resume`, `update-policy` | Only the human can create, change, or pause a policy. |
+| **Agent** | `pull` | Only the policy's registered agent can pull funds. |
+| **No signer** | `show` | Read-only; no keypair is required. |
+
+## Global options
+
+| Flag | Default | Meaning |
+| --- | --- | --- |
+| `-k, --keypair <path>` | `~/.config/solana/id.json` | A Solana CLI keypair file: a JSON array of bytes, as written by `solana-keygen new`. |
+| `-u, --url <url>` | `devnet` | `devnet`, `testnet`, `mainnet` (or `mainnet-beta`), `localnet` (or `localhost`), or a raw RPC URL. |
+
+> **Note:** `--url devnet` resolves to Solana's public Devnet endpoint, which can be heavily rate-limited. For anything beyond a quick check, pass a full RPC URL from a provider such as Helius or QuickNode.
+
+**Amounts use the mint's normal token units, not base units.** For example, `--per-call-cap 50.5` means 50.5 tokens. The CLI reads the mint's decimals from the chain and converts the amount for you. It rejects values with more decimal places than the mint supports.
+
+## `create-policy`
+
+Creates a policy and registers it as `delegatee` on a real Subscriptions & Allowances (S&A) delegation in one transaction. If the human does not yet have an S&A authority for the mint, the command initializes one first.
+
+**Signer:** Human (the policy owner).
+
+```bash
+shugo create-policy \
+  --keypair ~/.config/solana/human.json \
+  --url "$RPC" \
+  --mint <MINT> \
+  --agent <AGENT_PUBKEY> \
+  --per-call-cap 50 \
+  --velocity-cap 200 \
+  --velocity-window-seconds 3600 \
+  --destinations <RECEIVER_TOKEN_ACCOUNT> \
+  --delegation-amount 500 \
+  --delegation-expiry-days 30
+```
+
+### Options
+
+| Flag | Required | Meaning |
+| --- | --- | --- |
+| `--mint <address>` | Yes | The token mint governed by the policy. |
+| `--agent <address>` | Yes | The only signer allowed to call `pull`. |
+| `--per-call-cap <amount>` | Yes | Maximum amount per pull. |
+| `--velocity-cap <amount>` | Yes | Maximum amount allowed per window. |
+| `--velocity-window-seconds <seconds>` | Yes | Window length. Must be greater than zero. |
+| `--destinations <addresses>` | Yes | Comma-separated receiver **token accounts**, up to 4. |
+| `--delegation-amount <amount>` | Yes | Lifetime allowance of the underlying S&A delegation. |
+| `--delegation-expiry-days <days>` | Yes | Number of days from now until the delegation expires. |
+| `--policy-id <id>` | No | Defaults to `0`. Use distinct IDs for multiple policies on the same `(human, mint)` pair. |
+
+The command prints the `policy`, `delegation`, and `subscription authority` addresses, along with the transaction signature. Keep the policy and delegation addresses; both are required by `pull`.
+
+## `show`
+
+Reads a policy and prints its state. No keypair is needed.
+
+```bash
+shugo show <POLICY> --url "$RPC"
+```
+
+Example output:
+
+```text
+Policy 9KCcG1g2skJMsqfdjPuxDhMx5du1zDVyq1ogd1cpU6Lv
+  human:              AWvbdXNGDByBDcN4hSNWQE8wGmJ4QQDaoNQgu3wWZ14w
+  agent:              J3RN8vK1m38PP5xYpx3xuwx4ERANzV8iday7BEwSYrDP
+  mint:               3Ji3kzxK8NV5jBDxYYNgLT1A7EDLSLU5S9Cks5MXnP4f
+  paused:             false
+  per-call cap:       50
+  velocity cap:       200 per 3600s
+  pulled this window: 0
+  destinations:
+    - AMKfXcf4nDXcqvKagQ5MXscN37qqfeGs8V4cn3sHK6NF
+```
+
+`pulled this window` is the raw stored counter. If the window has expired, the old figure may still be shown until the next pull resets it. The reset happens when a pull is evaluated, not on a timer. See [How windows work](/velocity-caps#how-the-window-works).
+
+## `pull`
+
+Pulls funds through a policy.
+
+**Signer:** Agent (not the human).
+
+```bash
+shugo pull \
+  --keypair ~/.config/solana/agent.json \
+  --url "$RPC" \
+  --policy <POLICY> \
+  --delegation <DELEGATION> \
+  --amount 25 \
+  --destination <RECEIVER_TOKEN_ACCOUNT>
+```
+
+### Options
+
+| Flag | Required | Meaning |
+| --- | --- | --- |
+| `--policy <address>` | Yes | The policy to pull against. |
+| `--delegation <address>` | Yes | The underlying S&A delegation printed by `create-policy`. |
+| `--amount <amount>` | Yes | Amount to pull, in the mint's normal token units. |
+| `--destination <address>` | Yes | Receiver token account. It must be on the policy's allowlist. |
+
+If a policy check fails, the transaction is rejected during simulation and the program's logs are shown; the transaction is not submitted. See the [error reference](/velocity-caps#error-reference).
+
+## `pause` and `resume`
+
+These commands provide the policy kill switch. `pause` causes future pulls against the policy to fail immediately; `resume` re-enables them.
+
+**Signer:** Human (the policy owner).
+
+```bash
+shugo pause \
+  --keypair ~/.config/solana/human.json \
+  --url "$RPC" \
+  --policy <POLICY>
+
+shugo resume \
+  --keypair ~/.config/solana/human.json \
+  --url "$RPC" \
+  --policy <POLICY>
+```
+
+| Flag | Required | Meaning |
+| --- | --- | --- |
+| `--policy <address>` | Yes | The policy to pause or resume. |
+
+## `update-policy`
+
+Changes a policy's agent, caps, window length, or allowlist.
+
+**Signer:** Human (the policy owner).
+
+> **Warning:** `update-policy` replaces the **entire configuration**; it is not a partial patch. Every configuration flag is required, so pass the current value for any setting you do not want to change. Run `show` first and copy the current values.
+
+```bash
+shugo update-policy \
+  --keypair ~/.config/solana/human.json \
+  --url "$RPC" \
+  --policy <POLICY> \
+  --agent <AGENT_PUBKEY> \
+  --per-call-cap 50 \
+  --velocity-cap 200 \
+  --velocity-window-seconds 3600 \
+  --destinations <RECEIVER_TOKEN_ACCOUNT>
+```
+
+This command does not change `paused`, the amount already pulled in the current window, or the window's start. Use `pause` or `resume` to change the paused state. For the behavior of limits changed mid-window, see [Velocity Caps](/velocity-caps#changing-a-policy-mid-window).
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="error: required option '--agent <address>' not specified">
+    This is usually caused by an unset shell variable. An empty `$AGENT` expands to no argument, so `--agent $AGENT --per-call-cap 50` can become `--agent --per-call-cap 50`, causing the next flag to be consumed as the missing value.
+
+    Check the variable with `echo "AGENT=[$AGENT]"` and export it again if needed. Shell variables also do not automatically carry over to a new terminal tab.
+  </Accordion>
+
+  <Accordion title="Error: no policy account found at ...">
+    The address may be incorrect, or the CLI may be connected to a different cluster from the one where the policy was created. Check `--url`.
+  </Accordion>
+
+  <Accordion title="Simulation failed ... custom program error: 0x1770 (or 0x1771, 0x1772, etc.)">
+    A Shugo policy check rejected the pull. This is expected when a policy constraint is violated. `0x1770` is `Paused`; see the [error table](/velocity-caps#error-reference) for the other codes.
+  </Accordion>
+
+  <Accordion title="Simulation failed ... custom program error: 0x88">
+    S&A error 136, `StaleSubscriptionAuthority`, means the delegation was created against the wrong generation ID for the human's S&A authority. Current builds handle this automatically. If you see this error, make sure you are using a recent SDK and CLI build.
+  </Accordion>
+</AccordionGroup>

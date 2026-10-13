@@ -1,120 +1,171 @@
 ---
 title: "Quickstart"
-description: "Deploy an agent allowance and execute your first policy-guarded transfer in under 5 minutes."
+description: "Create a policy and run a real guarded pull against devnet with the Shugo CLI."
 ---
 
-import { Steps, Step, Tabs, Tab, Note, Warning } from '@mintlify/components';
+This walkthrough uses the `shugo` CLI, not the SDK — it's the fastest way to see the whole system work end to end, no code required. For wiring Shugo into an agent framework programmatically, see the [SDK Reference](/sdk-reference) once you understand the flow here.
 
-This guide walks you through setting up a Shugo allowance for an agent, configuring a velocity limit, and executing a bounded transfer via the TypeScript SDK.
+<Note>
+  Every command and every piece of example output on this page is copied from an actual run against live Solana devnet, not written to look plausible. Your addresses and signatures will differ; the shape of the output won't.
+</Note>
 
 ## Prerequisites
 
-- Node.js v18+ or Bun
-- A Solana keypair with Devnet or Mainnet-beta SOL
-- A SPL Token or Token-2022 mint address (e.g., USDC)
+- Node.js 18+ and [pnpm](https://pnpm.io)
+- The [Solana CLI](https://docs.anza.xyz/cli/install) tools (`solana`, `solana-keygen`, `spl-token`)
+- A devnet RPC endpoint. The public `api.devnet.solana.com` rate-limits aggressively under real use — a free endpoint from [Helius](https://dashboard.helius.dev), QuickNode, or similar is strongly recommended.
 
-<Steps>
-  <Step title="Install the SDK">
-    Install `@shugo-protocol/sdk` alongside `@solana/web3.js` and `@solana/spl-token`:
+## 1. Install the CLI
 
-    <Tabs>
-      <Tab title="npm">
-        ```bash
-        npm install @shugo-protocol/sdk @solana/web3.js @solana/spl-token
-        ```
-      </Tab>
-      <Tab title="pnpm">
-        ```bash
-        pnpm add @shugo-protocol/sdk @solana/web3.js @solana/spl-token
-        ```
-      </Tab>
-      <Tab title="bun">
-        ```bash
-        bun add @shugo-protocol/sdk @solana/web3.js @solana/spl-token
-        ```
-      </Tab>
-    </Tabs>
-  </Step>
+```bash
+git clone https://github.com/shugo-protocol/shugo.git
+cd shugo
+pnpm install
+pnpm --filter @shugo/sdk run build   # the CLI imports the SDK at runtime, so build it first
+pnpm --filter @shugo/cli run build
+```
 
-  <Step title="Initialize the Subscription Authority">
-    The treasury owner initializes the Shugo Subscription Authority PDA and delegates SPL Token authority over the designated token account.
+<Note>
+  If `pnpm install` reports ignored build scripts, approve `esbuild` with `pnpm approve-builds` — the CLI and SDK builds use it. The other packages it lists (`bufferutil`, `utf-8-validate`) are optional native speedups and can stay denied.
+</Note>
 
-    ```typescript
-    import { Connection, Keypair, PublicKey } from "@solana/web3.js";
-    import { ShugoClient, UNKNOWN_INIT_ID } from "@shugo-protocol/sdk";
+## 2. Set up three identities
 
-    const connection = new Connection("[https://api.devnet.solana.com](https://api.devnet.solana.com)", "confirmed");
-    const treasuryOwner = Keypair.fromSecretKey(/* ... */);
-    const agentPublicKey = new PublicKey("Agnt..."); // Ephemeral Agent Signer
-    const mint = new PublicKey("4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU"); // Devnet USDC
+Shugo separates three roles on purpose: the **human** who owns the policy and funds pulls, the **agent** who is the only signer allowed to call `pull`, and a **merchant** who receives funds. Keeping agent and merchant separate is what makes the destination allowlist demonstrable — an agent that can only pay a pre-approved merchant can't redirect funds anywhere else, even if it's compromised.
 
-    const shugo = new ShugoClient(connection, treasuryOwner);
+```bash
+solana-keygen new --outfile ~/.config/solana/human.json --no-bip39-passphrase
+solana-keygen new --outfile ~/.config/solana/agent.json --no-bip39-passphrase
+solana-keygen new --outfile ~/.config/solana/merchant.json --no-bip39-passphrase
 
-    // Create the delegation policy: Max 100 USDC per 216,000 slots (~24 hours)
-    const { txSignature, subscriptionAuthorityPda } = await shugo.createAllowance({
-      mint,
-      owner: treasuryOwner.publicKey,
-      agentDelegate: agentPublicKey,
-      velocityCapAmount: 100_000_000n, // 100 USDC (6 decimals)
-      windowSlots: 216_000n,           // ~24 hours on Solana mainnet
-      initId: UNKNOWN_INIT_ID,         // Sentinel for atomic same-slot initialization
-    });
+export RPC="<your devnet RPC URL>"
+solana airdrop 2 $(solana-keygen pubkey ~/.config/solana/human.json) --url "$RPC"
+solana airdrop 1 $(solana-keygen pubkey ~/.config/solana/agent.json) --url "$RPC"
+```
 
-    console.log(`Shugo Authority configured at: ${subscriptionAuthorityPda.toBase58()}`);
-    console.log(`Transaction confirmed: ${txSignature}`);
-    ```
+## 3. Create a test token
 
-    <Note>
-      `UNKNOWN_INIT_ID` (`i64::MIN`) allows the client to atomically construct and sign the policy creation without having to pre-fetch the current slot, preventing slot skew race conditions.
-    </Note>
-  </Step>
+```bash
+solana config set --keypair ~/.config/solana/human.json --url "$RPC"
+spl-token create-token --decimals 6
+# → Address: <MINT>
 
-  <Step title="Execute Agent Transfer within Limits">
-    Now authenticate as the **Agent** using its low-security keypair. The agent can transfer funds directly from the treasury's ATA to any approved vendor or recipient within its velocity cap.
+export MINT="<the mint address printed above>"
+spl-token create-account $MINT
+spl-token mint $MINT 1000
 
-    ```typescript
-    import { Connection, Keypair, PublicKey } from "@solana/web3.js";
-    import { ShugoAgentSession } from "@shugo-protocol/sdk";
+export AGENT=$(solana-keygen pubkey ~/.config/solana/agent.json)
+spl-token create-account $MINT \
+  --owner $(solana-keygen pubkey ~/.config/solana/merchant.json) \
+  --fee-payer ~/.config/solana/human.json
+# → Creating account <MERCHANT_ATA>
+export MERCHANT_ATA="<that address>"
+```
 
-    const connection = new Connection("[https://api.devnet.solana.com](https://api.devnet.solana.com)", "confirmed");
-    const agentKeypair = Keypair.fromSecretKey(/* agent operational key */);
-    const treasuryOwnerPubkey = new PublicKey("Trz...");
-    const recipientPubkey = new PublicKey("Vend...");
-    const mint = new PublicKey("4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU");
+## 4. Create the policy
 
-    const session = new ShugoAgentSession(connection, agentKeypair);
+This single command does three things in one transaction: initializes the human's S&A `SubscriptionAuthority` for this mint (if one doesn't already exist), creates the Shugo Policy, and creates the real S&A `FixedDelegation` naming the policy as `delegatee`.
 
-    // Move 15 USDC for an API query
-    const tx = await session.executeGuardedTransfer({
-      treasuryOwner: treasuryOwnerPubkey,
-      mint,
-      recipient: recipientPubkey,
-      amount: 15_000_000n,
-    });
+```bash
+cd packages/cli
+node dist/index.js create-policy \
+  --keypair ~/.config/solana/human.json \
+  --url "$RPC" \
+  --mint $MINT \
+  --agent $AGENT \
+  --per-call-cap 50 \
+  --velocity-cap 200 \
+  --velocity-window-seconds 3600 \
+  --destinations $MERCHANT_ATA \
+  --delegation-amount 500 \
+  --delegation-expiry-days 30
+```
 
-    console.log(`Transfer executed by agent: ${tx}`);
-    ```
-  </Step>
+```text Example output
+Policy created.
+  policy:                 9KCcG1g2skJMsqfdjPuxDhMx5du1zDVyq1ogd1cpU6Lv
+  delegation:             ACrVu2VNhRWAcUtjBPPzA4JAw16H5N7mYUJP2UuxYeAe
+  subscription authority: AR1Smx8y9ppKmh5Ks9Gx7ewv583a31WZGToYUJ85zCC7
+  signature:              aVcMDiuh9b25FGvunqX8uiD2CN8hTBfXJ22Ud6XP364zASA2xi19SfZBq5zzAfK93fkBRMvPgk95APj1Gz33b7K
+```
 
-  <Step title="Test the Velocity Guardrail">
-    If the agent attempts to move more than the remaining allocated limit or breaches policy, the transaction is rejected **on-chain** before state mutation occurs.
+Save the `policy` and `delegation` addresses — every command after this needs them.
 
-    ```typescript
-    try {
-      await session.executeGuardedTransfer({
-        treasuryOwner: treasuryOwnerPubkey,
-        mint,
-        recipient: recipientPubkey,
-        amount: 200_000_000n, // Exceeds the 100 USDC velocity cap
-      });
-    } catch (err: any) {
-      // Expected Error: SubscriptionsError::VelocityCapExceeded (0x1774)
-      console.error("Guarded by Shugo:", err.message);
-    }
-    ```
+```bash
+export POLICY="<policy address from above>"
+export DELEGATION="<delegation address from above>"
+```
 
-    <Warning>
-      Rejection happens at the runtime CPI layer: compute units are consumed minimally, and zero treasury tokens are debited.
-    </Warning>
-  </Step>
-</Steps>
+## 5. Inspect the policy
+
+Read-only — no keypair needed.
+
+```bash
+node dist/index.js show $POLICY --url "$RPC"
+```
+
+```text Example output
+Policy 9KCcG1g2skJMsqfdjPuxDhMx5du1zDVyq1ogd1cpU6Lv
+  human:              AWvbdXNGDByBDcN4hSNWQE8wGmJ4QQDaoNQgu3wWZ14w
+  agent:              J3RN8vK1m38PP5xYpx3xuwx4ERANzV8iday7BEwSYrDP
+  mint:               3Ji3kzxK8NV5jBDxYYNgLT1A7EDLSLU5S9Cks5MXnP4f
+  paused:             false
+  per-call cap:       50
+  velocity cap:       200 per 3600s
+  pulled this window: 0
+  destinations:
+    - AMKfXcf4nDXcqvKagQ5MXscN37qqfeGs8V4cn3sHK6NF
+```
+
+## 6. Pull funds — as the agent
+
+This is the command the agent actually runs. Note the keypair: it's the **agent's**, not the human's.
+
+```bash
+node dist/index.js pull \
+  --keypair ~/.config/solana/agent.json \
+  --url "$RPC" \
+  --policy $POLICY \
+  --delegation $DELEGATION \
+  --amount 25 \
+  --destination $MERCHANT_ATA
+```
+
+```text Example output
+Pulled 25 to AMKfXcf4nDXcqvKagQ5MXscN37qqfeGs8V4cn3sHK6NF
+  signature: 2zuEKWVeYDtmRqQUCqtxLZsPxxbUB1ksXEEmFEBLcWkEGTCvZGKMW1yCYrsJj7yXknup2pnJFVJQUM1rvtqmVndd
+```
+
+## 7. The kill switch
+
+One instruction pauses the policy — every future pull is denied immediately, regardless of amount or destination.
+
+```bash
+node dist/index.js pause --keypair ~/.config/solana/human.json --url "$RPC" --policy $POLICY
+
+# Try to pull while paused:
+node dist/index.js pull \
+  --keypair ~/.config/solana/agent.json --url "$RPC" \
+  --policy $POLICY --delegation $DELEGATION \
+  --amount 10 --destination $MERCHANT_ATA
+```
+
+```text Example output (the pull is rejected)
+Error: Simulation failed.
+Message: Transaction simulation failed: Error processing Instruction 0: custom program error: 0x1770.
+Logs:
+[
+  "Program 6gHABW3Rn5dsTdXKN2xzRdb4g9v2DjYmc9sKq1Wn8my9 invoke [1]",
+  "Program log: Instruction: ExecutePull",
+  "Program log: AnchorError occurred. Error Code: Paused. Error Number: 6000. Error Message: This policy is paused.",
+  ...
+]
+```
+
+```bash
+node dist/index.js resume --keypair ~/.config/solana/human.json --url "$RPC" --policy $POLICY
+```
+
+## What you just proved
+
+The agent could only ever pay `$MERCHANT_ATA` — a different destination would be denied the same way the paused pull was, by `execute_pull`'s own checks, before any CPI into S&A happens. Try it: build a second token account for an address that isn't `$MERCHANT_ATA` and attempt a pull to it. See [Core Concepts → Zero-Custody Architecture](/zero-custody) for why that matters and what S&A alone does and doesn't guarantee here.

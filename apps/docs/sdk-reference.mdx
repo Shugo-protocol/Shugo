@@ -1,0 +1,203 @@
+---
+title: "SDK Reference"
+description: "Build Shugo policy creation and guarded pulls directly into an agent framework with @shugo-protocol/sdk"
+---
+
+`@shugo-protocol/sdk` builds the transactions for everything the [CLI](/cli-reference) does, as plain functions you call from your own code. It never signs and never sends: every function returns an unsigned `Transaction` (or a single instruction) and leaves signing, fee payment, and submission to you. That's deliberate — your agent framework already has opinions about key management and RPC handling, and the SDK shouldn't override them.
+
+## Installation
+
+Install the SDK alongside `@solana/web3.js` (peer dependency):
+
+<CodeGroup>
+
+```bash npm
+npm install @shugo-protocol/sdk 
+```
+
+</CodeGroup>
+
+## Conventions
+
+- **Amounts** are base units, as `bigint`. `25_000_000n` is 25 tokens of a 6-decimal mint. The CLI converts from human-friendly decimals for you; the SDK does not. Read the mint's decimals yourself if you need to convert.
+- **Returned transactions are unsigned and incomplete.** Before sending, set `feePayer` and a fresh `recentBlockhash`, then sign with the right keypair. Set the blockhash immediately before sending — one fetched earlier can expire.
+- **Addresses** are `PublicKey` from `@solana/web3.js`, a peer dependency.
+
+## High-level helpers
+
+### `createPolicyAndDelegation`
+
+Builds the transaction that creates a policy and registers it as the delegatee on a real Subscriptions & Allowances delegation, in one atomic transaction. Signed by the human.
+
+```typescript
+import {
+  Connection,
+  Keypair,
+  PublicKey,
+  sendAndConfirmTransaction,
+} from "@solana/web3.js";
+import { createPolicyAndDelegation } from "@shugo-protocol/sdk";
+
+const connection = new Connection(process.env.RPC_URL!, "confirmed");
+const human = Keypair.fromSecretKey(/* the human's key */);
+
+const {
+  transaction,
+  policy,
+  delegation,
+  subscriptionAuthority,
+} = await createPolicyAndDelegation({
+  connection,
+  human: human.publicKey,
+  mint: new PublicKey("<mint>"),
+  agent: new PublicKey("<agent pubkey>"),
+  perCallCap: 50_000_000n,          // 50 tokens (6 decimals)
+  velocityCap: 200_000_000n,        // 200 tokens per window
+  velocityWindowSeconds: 3600n,     // one hour
+  destinations: [new PublicKey("<merchant token account>")],
+  delegationAmount: 500_000_000n,   // lifetime allowance on the S&A delegation
+  delegationExpiryUnixSeconds: BigInt(
+    Math.floor(Date.now() / 1000) + 30 * 86_400,
+  ),
+});
+
+transaction.feePayer = human.publicKey;
+transaction.recentBlockhash = (
+  await connection.getLatestBlockhash()
+).blockhash;
+
+const signature = await sendAndConfirmTransaction(
+  connection,
+  transaction,
+  [human],
+);
+```
+
+#### Parameters
+
+| Parameter | Type | Notes |
+| --- | --- | --- |
+| `connection` | `Connection` | Used to check whether the human already has an S&A authority for this mint. |
+| `human` | `PublicKey` | Owns the policy; signs this transaction. |
+| `mint` | `PublicKey` | The token the policy governs. |
+| `agent` | `PublicKey` | The only signer who may later call `execute_pull`. |
+| `perCallCap` | `bigint` | Maximum amount per pull, in base units. |
+| `velocityCap` | `bigint` | Maximum amount per window, in base units. |
+| `velocityWindowSeconds` | `bigint` | Window length in seconds. Must be greater than zero. |
+| `destinations` | `PublicKey[]` | Allowed receiver token accounts. At most 4 (`MAX_DESTINATIONS`). |
+| `delegationAmount` | `bigint` | Total lifetime allowance of the underlying S&A delegation. |
+| `delegationExpiryUnixSeconds` | `bigint` | When that delegation expires. |
+| `policyId` | `bigint?` | Defaults to `0n`. Use distinct IDs for several policies on one `(human, mint)`. |
+| `delegationNonce` | `bigint?` | Defaults to `0n`. |
+
+**Returns:** `{ transaction, policy, delegation, subscriptionAuthority }` — the unsigned transaction and the three addresses it creates or uses.
+
+#### Behavior to know about
+
+The function checks on-chain whether the human already has a `SubscriptionAuthority` for this mint:
+
+- **If not:** it includes the `initialize_subscription_authority` instruction and passes S&A's `UNKNOWN_INIT_ID` sentinel to `create_fixed_delegation`. The authority's generation ID is the slot it's created in, which can't be known before the transaction lands; the sentinel tells S&A to accept an authority created in the same slot.
+- **If so:** it decodes the existing authority, confirms it belongs to this human and mint, and passes its real `init_id`.
+
+### `buildExecutePullTransaction`
+
+Builds the transaction an agent sends to pull funds through a policy. Signed by the agent.
+
+```typescript
+import { buildExecutePullTransaction } from "@shugo-protocol/sdk";
+
+const { transaction, policyAccount } = await buildExecutePullTransaction({
+  connection,
+  agent: agent.publicKey,
+  policy: new PublicKey("<policy>"),
+  delegation: new PublicKey("<delegation>"),
+  amount: 25_000_000n,
+  destination: new PublicKey("<merchant token account>"),
+});
+
+transaction.feePayer = agent.publicKey;
+transaction.recentBlockhash = (
+  await connection.getLatestBlockhash()
+).blockhash;
+
+await sendAndConfirmTransaction(connection, transaction, [agent]);
+```
+
+It reads the live policy account to derive everything else `execute_pull` needs — the human, the mint, the S&A authority, the human's token account, and the event authority. A caller only has to know the policy, the delegation, an amount, and a destination.
+
+`policyAccount` is the policy state the transaction was built against, which is useful for showing what's about to be checked.
+
+## Instruction builders
+
+Lower-level builders return a single `TransactionInstruction`, for when you're composing your own transactions. Account orders match the program's `#[derive(Accounts)]` structs exactly.
+
+| Function | Signer | Purpose |
+| --- | --- | --- |
+| `buildInitPolicyInstruction(params)` | Human | Creates the Policy PDA. |
+| `buildExecutePullInstruction(params)` | Agent | The guarded pull. Takes an optional `extraAccounts` array for future Token-2022 hook support. |
+| `buildSetPausedInstruction(human, policy, paused)` | Human | `true` pauses; `false` resumes. |
+| `buildUpdatePolicyInstruction(params)` | Human | Changes agent, caps, window, or allowlist. |
+| `buildInitializeSubscriptionAuthorityInstruction(user, mint, subscriptionAuthority, userAta)` | User | S&A setup. |
+| `buildCreateFixedDelegationInstruction(params)` | Delegator | S&A setup. Takes `expectedSubscriptionAuthorityInitId` — see the sentinel note above. |
+
+## Reading state
+
+```typescript
+import {
+  GUARD_PROGRAM_ID,
+  activeDestinations,
+  decodePolicy,
+} from "@shugo-protocol/sdk";
+
+const info = await connection.getAccountInfo(policyAddress);
+
+if (!info || !info.owner.equals(GUARD_PROGRAM_ID)) {
+  throw new Error("not a Shugo policy account");
+}
+
+const policy = decodePolicy(info.data);
+
+console.log(
+  policy.paused,
+  policy.windowPulled,
+  activeDestinations(policy),
+);
+```
+
+| Function | Returns |
+| --- | --- |
+| `decodePolicy(data)` | `PolicyAccount` — every field from the account table, as typed values. |
+| `activeDestinations(policy)` | Only the in-use allowlist entries, trimmed to `destinationCount`. |
+| `decodeSubscriptionAuthority(data)` | `{ user, tokenMint, payer, bump, initId }`. Requires exactly `SUBSCRIPTION_AUTHORITY_LEN` (106) bytes. |
+
+## Address derivation
+
+| Function | Derives |
+| --- | --- |
+| `derivePolicyAddress(human, mint, policyId)` | The Policy PDA. |
+| `deriveSubscriptionAuthorityAddress(user, mint)` | S&A's per-user, per-mint authority. |
+| `deriveDelegationAddress(subscriptionAuthority, delegator, delegatee, nonce)` | S&A's delegation account. |
+| `deriveEventAuthorityAddress()` | S&A's fixed event-authority PDA. |
+| `deriveAssociatedTokenAddress(owner, mint, tokenProgram)` | A standard associated token account. |
+
+Each PDA function returns `[address, bump]`.
+
+## Constants
+
+The SDK exports:
+
+- `GUARD_PROGRAM_ID`
+- `SUBSCRIPTIONS_PROGRAM_ID`
+- `TOKEN_PROGRAM_ID`
+- `ASSOCIATED_TOKEN_PROGRAM_ID`
+- `MAX_DESTINATIONS` (`4`)
+- `UNKNOWN_INIT_ID` (`i64::MIN`, as a `bigint`)
+
+## Extension points
+
+Two functions exist today as deliberate no-ops, so that adding the missing support later changes one function each and nothing that calls them:
+
+- `resolveExtraAccountsForMint(connection, mint)` returns `[]`. This is where Token-2022 transfer-hook accounts will be resolved. `buildExecutePullTransaction` already spreads its result onto the instruction.
+- `checkMintSupported(connection, mint)` accepts every mint. This is where unsupported-mint rejection will live.
+
+See the FAQ for what each gap means in practice.

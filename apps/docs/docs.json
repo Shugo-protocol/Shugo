@@ -1,6 +1,6 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "theme": "mint",
+  "theme": "luma",
   "name": "shugo",
   "logo": {
     "dark": "/shugo-wordmark-dark.png",
@@ -22,27 +22,31 @@
     "tabs": [
       {
         "tab": "Docs",
-        "groups": [
+        "pages": [
           {
             "group": "Getting Started",
             "pages": [
               "introduction",
-              "quickstart"
+              "quickstart",
+              "architecture"
             ]
           },
           {
             "group": "Core Concepts",
             "pages": [
-              "zero-custody",
-              "velocity-caps"
+              "velocity-caps",
+              "velocity-caps-and-limits",
+              "security"
             ]
-          }
-        ]
-      },
-      {
-        "tab": "News",
-        "pages": [
-          "news"
+          },
+          {
+            "group": "reference",
+            "pages": [
+              "sdk-reference",
+              "cli-reference"
+            ]
+          },
+          "faq"
         ]
       },
       {
@@ -52,5 +56,24 @@
         ]
       }
     ]
+  },
+  "navbar": {
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/Shugo-protocol"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/Shugo-protocol",
+      "website": "https://www.shugo.website",
+      "x": "https://x.com/ShugoProtocol"
+    }
+  },
+  "icons": {
+    "library": "tabler"
+  },
+  "background": {
+    "image": "/apps/docs/images/Shugo(2).png"
   }
 }

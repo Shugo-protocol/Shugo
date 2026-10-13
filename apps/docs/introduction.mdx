@@ -1,37 +1,62 @@
 ---
-title: 'introduction'
-description: 'on-chain guardrails for the agentic economy'
+title: "Introduction"
+description: "On-chain guardrails for autonomous agents, built on Solana's official Subscriptions & Allowances program."
 ---
 
-## the problem
+## The problem
 
-giving autonomous ai agents direct access to private keys is a catastrophic security risk. whether an agent hallucinates, falls victim to prompt injection, or encounters a malicious target contract, a fully custodial agent wallet means your entire treasury is exposed. 
+Giving an autonomous AI agent direct access to a private key is a bet you can't take back. A prompt injection, a hallucinated instruction, or a bug in an agent framework can turn into an unbounded transfer the moment the agent can sign for your wallet. A multisig fixes this but defeats the point of autonomy — a human has to click approve every time. A hot wallet with a raw keypair fixes the autonomy problem by reintroducing the first one. 
 
-traditional multisigs require human intervention, defeating the purpose of autonomy. custodial hot wallets are reckless. 
+Solana's own [Subscriptions & Allowances](https://github.com/solana-foundation/subscriptions) program, shipped by the Solana Foundation in June 2026, solves the custody half of this: a human delegates a capped, time-limited allowance to another address, and funds never leave the human's wallet until a pull actually happens. But the base program is deliberately simple. It enforces an amount and an expiry on one delegation — nothing more. It has no concept of a destination allowlist, no way to cap total spend across several delegations held by the same agent, and no single instruction to freeze everything at once.
 
-## the solution
+## What Shugo adds
 
-**shugo (守護)** is a zero-custody policy delegation protocol built on solana. instead of giving an ai agent a wallet containing funds, you give it an *allowance* tied to strict, on-chain cryptographic rules.
-
-shugo leverages solana's official **subscriptions & allowances (s&a)** program to provide a velocity limitation layer, formally verified via aws kani.
+Shugo is a thin policy layer that sits between an agent and a real Subscriptions & Allowances delegation. A **Policy** — an account our program controls — is registered as the `delegatee` on the real delegation instead of the agent's raw keypair. Every time the agent wants to pull funds, it calls our program, not S&A directly; our program checks the policy, and only if every check passes does it forward the call into S&A's own `transfer_fixed` instruction via CPI.
 
 <CardGroup cols={2}>
-  <Card title="zero custody" icon="key">
-    agents never hold the private keys to the treasury. access is delegated via cpi and can be instantly revoked.
+  <Card title="Per-call cap" icon="gauge">
+    A hard ceiling on how much a single pull can move, independent of what the underlying delegation itself allows.
   </Card>
-  <Card title="velocity caps" icon="shield">
-    enforce hard limits on how much value an agent can move per epoch, bounding maximum potential loss.
+  <Card title="Velocity cap" icon="chart-line">
+    A maximum total amount an agent can pull within a fixed time window — measured in seconds, not slots — so a burst of small pulls can't add up to an unbounded drain inside one window.
   </Card>
-  <Card title="target allowlists" icon="crosshairs">
-    restrict agents to specific pre-approved smart contracts (e.g., only jupiter routing or raydium pools).
+  <Card title="Destination allowlist" icon="list-check">
+    Up to four receiver token accounts a pull is allowed to pay out to. S&A itself places no constraint on where a pull sends funds; this is the gap that closes.
   </Card>
-  <Card title="formal verification" icon="check-double">
-    core program logic is formally verified via aws kani to guarantee policy enforcement mathematically.
+  <Card title="Instant kill switch" icon="hand">
+    One instruction pauses every future pull against a policy immediately, regardless of how many delegations sit under it. No per-delegation revocation needed.
   </Card>
 </CardGroup>
 
-## how it works
+None of this touches token custody. The actual SPL transfer still happens inside S&A's own audited program; Shugo only decides whether to let that CPI happen at all.
 
-1. **the treasury (human):** a standard solana wallet or multisig holding funds.
-2. **the guardrail (shugo):** an on-chain policy that defines exactly what the agent is allowed to do.
-3. **the agent (ai):** a lightweight keypair that signs transactions. the treasury delegates execution authority to this keypair, bounded by the shugo policy.
+## How it works
+
+1. **The human** — a standard wallet, holds the funds, never hands them to the agent directly.
+2. **The Policy** — a PDA our program controls, holding the rules: per-call cap, velocity cap, window length, destination allowlist, paused flag.
+3. **The delegation** — a real S&A `FixedDelegation`, created by the human, naming the Policy's own address as `delegatee`.
+4. **The agent** — a lightweight keypair that signs `pull` calls. It never holds an SPL delegate authority of its own; S&A only ever sees the Policy PDA as the thing it trusts.
+
+<Info>
+  Every claim on this page was verified during development, not just implemented — a deployed devnet program (`6gHABW3Rn5dsTdXKN2xzRdb4g9v2DjYmc9sKq1Wn8my9`), 7 passing integration tests against a real Subscriptions & Allowances CPI, and a Kani proof covering 483 checks on the policy-evaluation logic. See [Security](/security) for the actual proof, not a description of one.
+</Info>
+
+## Where to go next
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Create a policy and run your first guarded pull against devnet in a few minutes, using the CLI.
+  </Card>
+
+  <Card title="Architecture" icon="diagram-project" href="/architecture">
+    The full account model, instruction set, and CPI flow.
+  </Card>
+
+  <Card title="SDK Reference" icon="code" href="/sdk-reference">
+    Build policy creation and pulls directly into an agent framework with `@shugo/sdk`.
+  </Card>
+
+  <Card title="CLI Reference" icon="terminal" href="/cli-reference">
+    Every `shugo` command, with the flags it actually takes.
+  </Card>
+</CardGroup>

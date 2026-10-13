@@ -1,0 +1,34 @@
+---
+title: "Change log"
+description: "What has shipped in Shugo, and what changed along the way."
+---
+
+<Update label="v0.1.0" description="First devnet release">
+  ### Program
+
+  - Four instructions: `init_policy`, `execute_pull`, `set_paused`, and `update_policy`.
+  - Deployed to devnet at `6gHABW3Rn5dsTdXKN2xzRdb4g9v2DjYmc9sKq1Wn8my9`.
+  - `execute_pull` evaluates the policy, then CPIs into Subscriptions & Allowances' `transfer_fixed` with the Policy PDA signing as `delegatee`.
+
+  ### Verification
+
+  - Kani proof of the policy-evaluation logic: 483 checks, 0 failures. See [Security](/security).
+  - Seven integration tests running Shugo and the real Subscriptions & Allowances binary together in LiteSVM.
+
+  ### SDK — `@shugo/sdk`
+
+  - `createPolicyAndDelegation` and `buildExecutePullTransaction`, plus instruction builders, address derivation, and account decoders. See the [SDK Reference](/sdk-reference).
+
+  ### CLI — `@shugo/cli`
+
+  - `create-policy`, `show`, `pull`, `pause`, `resume`, and `update-policy`. See the [CLI Reference](/cli-reference).
+  - Verified end to end against live devnet: policy creation, a guarded pull, a pause that rejects the next pull on-chain, and resume.
+
+  ### Fixed
+
+  - **`create-policy` failed on live clusters with S&A error 136 (`StaleSubscriptionAuthority`).** The SDK passed a hardcoded `0` as the authority's generation ID. A real authority's ID is the slot it was created in, so the value was wrong on any real cluster; it only passed in tests because LiteSVM's clock starts at slot 0. The SDK now passes S&A's same-slot sentinel when it creates the authority in the same transaction, and reads the real value when the authority already exists. The test suite now runs at a realistic slot.
+
+  ### Known limitations
+
+  Token-2022 transfer-hook mints aren't supported yet, `init_policy` doesn't validate mints, and the program is unaudited and devnet-only. The full list is in the [FAQ](/faq#known-limitations).
+</Update>

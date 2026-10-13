@@ -1,0 +1,88 @@
+---
+title: "FAQ"
+description: "Common questions, the worst case a policy allows, and the known limits of what's built."
+---
+
+## Known limitations
+
+Everything here is a deliberate scope decision or an unfinished piece, not a hidden surprise. None of it makes the shipped behavior incorrect; it bounds what you should expect from it.
+
+| Limitation | What it means in practice |
+| --- | --- |
+| **Devnet only** | The program is deployed to devnet. Nothing here has been run on mainnet. |
+| **Unaudited** | Shugo's own program has no third-party audit. See [Security](/security). |
+| **No Token-2022 transfer-hook support** | `execute_pull` doesn't forward hook accounts, so mints with a configured hook fail at the S&A CPI. |
+| **No mint validation** | `init_policy` accepts any mint, including ones `execute_pull` can't handle. |
+| **Fixed windows** | The velocity window resets rather than slides, so a boundary burst can reach 2× the cap. See [Velocity Caps](/velocity-caps#fixed-windows-allow-a-boundary-burst). |
+| **Caps are per policy** | Two policies for the same human don't share a budget. Combined exposure is the sum of their caps. |
+| **Up to 4 destinations** | The allowlist is a fixed-size array. Raising the limit needs a state migration. |
+| **Fixed delegations only** | Shugo wraps S&A's `transfer_fixed`. Recurring delegations and merchant subscription plans aren't wrapped. |
+| **No `close_policy`** | There's no instruction to close a policy and reclaim its rent. |
+| **SDK and CLI not on npm** | Use them from the monorepo for now. |
+
+## About the guarantees
+
+<AccordionGroup>
+  <Accordion title="What's the worst a compromised agent can do?">
+    The agent can only call `execute_pull`, and every pull is checked, so its reach is bounded by four things at once:
+
+    - **Per pull:** at most `per_call_cap`.
+    - **Per window:** at most `velocity_cap` — or up to 2× across a window boundary.
+    - **Lifetime:** at most the S&A delegation's remaining `amount`, which never resets.
+    - **Where:** only to the policy's allowlisted token accounts.
+
+    And it all stops the moment you `pause` the policy, or when the delegation expires. The agent cannot change any of these limits itself — only the human can sign `update_policy`.
+  </Accordion>
+
+  <Accordion title="Can the agent raise its own limits or change the allowlist?">
+    No. `update_policy` and `set_paused` require the human's signature, enforced on-chain by a `has_one = human` constraint in the program. To be precise about the evidence: the integration tests cover the agent side (a signer who isn't the registered agent can't pull), but they don't include a test of a non-human attempting `update_policy` or `pause`. That protection is in the program's source and not yet exercised by a test of its own.
+  </Accordion>
+
+  <Accordion title="Does Shugo ever hold my tokens?">
+    No. Tokens stay in the human's token account until a pull executes, and the transfer is performed by S&A's own program. Shugo's program decides whether to let that CPI happen; it never takes custody. See [Zero-Custody Architecture](/zero-custody).
+  </Accordion>
+
+  <Accordion title="If I pause a policy, is the delegation revoked?">
+    No. Pausing stops Shugo from forwarding pulls, but the underlying S&A delegation still exists with its remaining allowance. To remove it entirely, use S&A's own `revoke_delegation`, which the Shugo SDK doesn't currently wrap.
+  </Accordion>
+
+  <Accordion title="Can one agent have several policies, or one policy several agents?">
+    A policy has exactly one agent. Use distinct `policy_id` values to create several policies for the same `(human, mint)` — for example one per agent. Their caps are independent; there's no shared budget across policies today.
+  </Accordion>
+</AccordionGroup>
+
+## Token-2022
+
+<AccordionGroup>
+  <Accordion title="Does Shugo support Token-2022 mints?">
+    Not yet, and the specifics matter. Subscriptions & Allowances itself supports Token-2022 mints, including mints with an active transfer hook — provided the caller appends the hook's extra accounts to the transfer. Shugo's `execute_pull` doesn't append them yet, so a pull against a hook-enabled mint fails at the S&A boundary. Plain SPL Token mints are the tested path. Token-2022 mints _without_ a configured hook haven't been tested through Shugo, so they're not claimed as supported either.
+  </Accordion>
+
+  <Accordion title="What happens if I create a policy for an unsupported mint?">
+    `init_policy` succeeds — it doesn't validate the mint yet — and pulls then fail. Nothing is misdirected and no funds are at risk; the failure is just a confusing error at pull time instead of a clear one at creation time. Both gaps already have their extension points in the SDK (`resolveExtraAccountsForMint` and `checkMintSupported`), so adding support is a contained change.
+  </Accordion>
+</AccordionGroup>
+
+## Running your own copy
+
+<AccordionGroup>
+  <Accordion title="anchor deploy fails with 'AccountNotFound ... error sending request for url'">
+    That message is a misleading wrapper around a network failure — in practice, the public devnet RPC choking on the program upload, which sends many chunked transactions in quick succession. A single `getHealth` ping can succeed while a deploy fails.
+
+    Switch to a private RPC, and pass its **full URL** as the cluster:
+
+    ```bash
+    anchor deploy --provider.cluster "https://devnet.helius-rpc.com/?api-key=<your key>"
+    ```
+
+    Setting `solana config set --url ...` isn't enough: `--provider.cluster devnet` is a keyword Anchor maps to its own built-in URL, independent of your Solana CLI config.
+  </Accordion>
+
+  <Accordion title="solana airdrop says it failed, but did it?">
+    Not necessarily. During development, the CLI reported a rate-limit failure for an airdrop whose funds had in fact arrived. Check `solana balance <address> --url <rpc>` before retrying. If the faucet genuinely keeps refusing, a web faucet is the usual fallback.
+  </Accordion>
+
+  <Accordion title="Why does the program ID matter if I redeploy?">
+    The program's address is baked into the SDK (`GUARD_PROGRAM_ID`) and into PDA derivation. A redeploy under a different address needs `anchor keys sync`, a rebuild, and the SDK constant updated to match — otherwise derived policy addresses won't line up with the deployed program.
+  </Accordion>
+</AccordionGroup>

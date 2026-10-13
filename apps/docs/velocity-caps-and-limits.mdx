@@ -1,0 +1,84 @@
+---
+title: "Velocity Caps & Limits"
+description: "How Shugo bounds what an agent can pull — per call, per time window, and per destination."
+---
+
+## Evaluation order
+
+Every `execute_pull` runs the same checks in the same order, and stops at the first one that fails. Nothing is written to the policy and no CPI happens unless **all** of them pass.
+
+| # | Check | Denies with |
+| --- | --- | --- |
+| 1 | Policy is not paused | `Paused` |
+| 2 | `amount` ≤ `per_call_cap` | `ExceedsPerCallCap` |
+| 3 | Window total plus `amount` ≤ `velocity_cap` (no overflow) | `ExceedsVelocityCap` / `Overflow` |
+| 4 | `destination` is on the policy's allowlist | `DestinationNotAllowed` |
+
+Two further checks run before the policy logic itself: the signer must be the policy's registered `agent` (`Unauthorized` otherwise), and the receiver token account passed in must equal the `destination` being checked — without that second check a caller could satisfy the allowlist with one address while paying out to another.
+
+## How the window works
+
+The window is **time-based and fixed**:
+
+- It is measured in **seconds** (`velocity_window_s`) against the cluster's Unix timestamp. It is not a slot count.
+- A window begins when the policy is created and covers `[window_start_ts, window_start_ts + velocity_window_s)`.
+- Each allowed pull adds its amount to `window_pulled`.
+- The first pull **at or after** the end of the window resets `window_pulled` to zero and starts a new window at that pull's timestamp.
+
+### Worked example
+
+A policy with `per_call_cap = 50`, `velocity_cap = 200`, `velocity_window_s = 3600`, created at `t = 0`:
+
+| Time | Request | Window state before | Result |
+| --- | --- | --- | --- |
+| `t = 100` | pull 50 | 0 / 200 | allowed, now 50 / 200 |
+| `t = 900` | pull 50 | 50 / 200 | allowed, now 100 / 200 |
+| `t = 1500` | pull 60 | 100 / 200 | **denied**: exceeds `per_call_cap` (50) |
+| `t = 2000` | pull 50 ×2 | 100 / 200 | both allowed, now 200 / 200 |
+| `t = 2100` | pull 1 | 200 / 200 | **denied**: `ExceedsVelocityCap` |
+| `t = 3700` | pull 50 | window expired | window resets at `t = 3700`, allowed, now 50 / 200 |
+
+### Fixed windows allow a boundary burst
+
+<Warning>
+  Because the window resets completely rather than sliding, an agent can pull up to `velocity_cap` in the last moments of one window and up to `velocity_cap` again at the start of the next. The worst case across a window boundary is **2 × `velocity_cap`** in a short span, even though no single window ever exceeds its cap.
+</Warning>
+
+This is the standard property of fixed-window limiters, and it's a deliberate simplicity tradeoff: the whole policy state is three integers, which keeps the evaluation logic small enough to verify exhaustively (see [Security](/security)). If a 2× burst at a boundary is unacceptable for your use case, size `velocity_cap` as half of your true worst-case tolerance.
+
+## Three layers, three owners
+
+A pull has to clear limits enforced by two different programs. Knowing which layer owns which limit tells you where to look when a pull is rejected.
+
+| Limit | Enforced by | Scope |
+| --- | --- | --- |
+| `per_call_cap` | Shugo | One pull |
+| `velocity_cap` over `velocity_window_s` | Shugo | One window |
+| Destination allowlist | Shugo | One pull |
+| Delegation `amount` | Subscriptions & Allowances | Lifetime of the delegation. It decrements on every pull and never resets. |
+| Delegation `expiry_ts` | Subscriptions & Allowances | Hard end date of the delegation |
+
+The S&A delegation is the outer envelope — the most the agent can ever pull in total, ever — and Shugo's caps shape how fast the agent can move within it.
+
+## Changing a policy mid-window
+
+`update_policy` changes the caps, the window length, the agent, and the allowlist. It deliberately **does not** touch `window_pulled` or `window_start_ts` — those are runtime state, not configuration.
+
+One consequence worth knowing: if you lower `velocity_cap` while a window is in progress, the amount already pulled in that window is immediately measured against the _new_ cap. Tightening a limit can only make the policy stricter for the rest of the window, never looser.
+
+## Error reference
+
+Shugo's errors follow Anchor's standard numbering: custom errors start at 6000 and increase in declaration order.
+
+| Code | Name | Message |
+| --- | --- | --- |
+| `6000` | `Paused` | This policy is paused |
+| `6001` | `ExceedsPerCallCap` | Amount exceeds the per-call cap |
+| `6002` | `ExceedsVelocityCap` | Amount would exceed the velocity cap for the current window |
+| `6003` | `DestinationNotAllowed` | Destination is not on this policy's allowlist |
+| `6004` | `TooManyDestinations` | Too many destinations for one policy |
+| `6005` | `Unauthorized` | Only the human who owns this policy can do that |
+| `6006` | `Overflow` | Arithmetic overflow while evaluating the policy |
+| `6007` | `UnsupportedMint` | Reserved for mint validation, not yet enforced |
+
+In transaction logs these appear as hex: `Paused` is `0x1770` (6000), `ExceedsPerCallCap` is `0x1771`, and so on. Errors from the underlying Subscriptions & Allowances program use its own separate range starting at 100 — for example `136` (`0x88`), `StaleSubscriptionAuthority`.
