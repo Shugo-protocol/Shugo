@@ -3,14 +3,14 @@
   "theme": "luma",
   "name": "shugo",
   "logo": {
-    "dark": "/apps/docs/images/Shugo(1)(1).png",
-    "light": "/apps/docs/images/Shugo(2)(1).png"
+    "dark": "/images/Shugo(1)(1).png",
+    "light": "/images/Shugo(2)(1).png"
   },
   "favicon": "/favicon.svg",
   "colors": {
-    "primary": "#FC4C02",
-    "light": "#FC4C02",
-    "dark": "#FC4C02"
+    "primary": "#1AF193",
+    "light": "#087F52",
+    "dark": "#1AF193"
   },
   "topbarLinks": [
     {
@@ -77,8 +77,7 @@
     "decoration": "gradient"
   },
   "appearance": {
-    "default": "light",
-    "strict": false
+    "default": "light"
   },
   "styling": {
     "eyebrows": "breadcrumbs"

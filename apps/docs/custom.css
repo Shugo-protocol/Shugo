@@ -1,0 +1,184 @@
+/* =====================================================
+   SHUGO DOCS — BRAND & ACCESSIBILITY
+   Brand mint: #1AF193
+   ===================================================== */
+:root {
+  --shugo-mint: #1AF193;
+  --shugo-green-dark: #087F52;
+  --shugo-green-hover: #12D981;
+  --shugo-border: rgba(128, 128, 128, 0.25);
+}
+
+/* -----------------------------------------------------
+   1. LINKS
+   ----------------------------------------------------- */
+a {
+  transition: color 150ms ease;
+}
+
+a:hover {
+  color: var(--shugo-green-dark) !important;
+}
+
+.dark a:hover,
+[data-theme="dark"] a:hover {
+  color: var(--shugo-mint) !important;
+}
+
+/* Accessible keyboard focus */
+a:focus-visible,
+button:focus-visible,
+[role="button"]:focus-visible {
+  outline: 2px solid var(--shugo-green-dark);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+/* -----------------------------------------------------
+   2. SIDEBAR & NAVIGATION
+   ----------------------------------------------------- */
+aside a:hover,
+nav a:hover {
+  border-radius: 6px;
+}
+
+/* Active navigation item */
+aside a[aria-current="page"],
+nav a[aria-current="page"] {
+  color: var(--shugo-green-dark) !important;
+  font-weight: 600;
+}
+
+.dark aside a[aria-current="page"],
+.dark nav a[aria-current="page"],
+[data-theme="dark"] aside a[aria-current="page"],
+[data-theme="dark"] nav a[aria-current="page"] {
+  color: var(--shugo-mint) !important;
+}
+
+/* -----------------------------------------------------
+   3. BUTTONS
+   ----------------------------------------------------- */
+/* Hover should never make button labels disappear */
+button,
+[role="button"] {
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease;
+}
+
+/* Mint-filled buttons */
+button[class*="bg-primary"],
+[role="button"][class*="bg-primary"] {
+  color: #06140D;
+}
+
+button[class*="bg-primary"]:hover,
+[role="button"][class*="bg-primary"]:hover {
+  background-color: var(--shugo-green-hover) !important;
+  color: #06140D !important;
+}
+
+/* Outlined controls */
+button[class*="border"]:hover,
+[role="button"][class*="border"]:hover {
+  border-color: var(--shugo-green-dark);
+}
+
+/* -----------------------------------------------------
+   4. NAVBAR LOGO — LARGER BRAND MARK
+   ----------------------------------------------------- */
+/* Homepage-linked logo */
+header a[href="/"] img,
+header a[href="/"] picture img {
+  height: 40px !important;
+  width: auto !important;
+  max-width: 220px !important;
+  object-fit: contain;
+  display: block;
+}
+
+/* Align the logo vertically */
+header a[href="/"] {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+/* If the logo is an SVG instead of an image */
+header a[href="/"] svg {
+  max-height: 40px;
+  width: auto;
+}
+
+/* -----------------------------------------------------
+   5. INLINE CODE
+   ----------------------------------------------------- */
+:not(pre) > code {
+  padding: 0.15em 0.4em;
+  border: 1px solid var(--shugo-border);
+  border-radius: 5px;
+  background: rgba(128, 128, 128, 0.10);
+  font-size: 0.89em;
+  overflow-wrap: anywhere;
+}
+
+/* -----------------------------------------------------
+   6. CODE BLOCKS
+   ----------------------------------------------------- */
+pre {
+  border: 1px solid var(--shugo-border);
+  border-radius: 12px;
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+pre code {
+  font-variant-ligatures: none;
+  tab-size: 2;
+}
+
+/* -----------------------------------------------------
+   7. TABLES & CALLOUTS
+   ----------------------------------------------------- */
+th,
+td {
+  border-color: var(--shugo-border);
+}
+
+blockquote {
+  border-left-color: var(--shugo-mint);
+}
+
+/* -----------------------------------------------------
+   8. MOBILE
+   ----------------------------------------------------- */
+@media (max-width: 768px) {
+  header a[href="/"] img,
+  header a[href="/"] picture img {
+    height: 32px !important;
+    max-width: 175px !important;
+  }
+
+  header a[href="/"] svg {
+    max-height: 32px;
+  }
+
+  pre {
+    overflow-x: auto;
+  }
+}
+
+/* -----------------------------------------------------
+   9. REDUCED MOTION
+   ----------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
