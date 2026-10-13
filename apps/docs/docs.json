@@ -80,7 +80,7 @@
     }
   },
   "appearance": {
-    "default": "dark"
+    "default": "light"
   },
   "styling": {
     "eyebrows": "breadcrumbs"

@@ -94,8 +94,8 @@ button[class*="border"]:hover,
 img.nav-logo,
 header a[href="/"] img,
 header a[href="/"] picture img {
-  height: 44px !important;
-  width: 140px !important;
+  height: 32px !important;
+  width: 100px !important;
   max-width: none !important;
   object-fit: cover !important;
   object-position: center !important;
@@ -174,6 +174,28 @@ card:hover,
   border-color: var(--shugo-mint) !important;
 }
 
+/* -----------------------------------------------------
+   4d. CENTERED LAYOUT (sidebar + TOC pulled toward the text)
+   ----------------------------------------------------- */
+@media (min-width: 1280px) {
+  :root {
+    --shugo-layout-width: 1240px;
+    --shugo-gutter: max(0px, calc((100vw - var(--shugo-layout-width)) / 2));
+  }
+
+  /* Keep the page, sidebar and table of contents in one centered column */
+  #body-content {
+    max-width: var(--shugo-layout-width);
+    margin-left: auto !important;
+    margin-right: auto !important;
+  }
+
+  /* Sidebar is fixed in some themes: offset it to the centered column */
+  #sidebar {
+    left: var(--shugo-gutter) !important;
+  }
+}
+
 /* Larger, tighter page title */
 #page-title {
   font-weight: 600;
@@ -239,8 +261,8 @@ blockquote {
   img.nav-logo,
   header a[href="/"] img,
   header a[href="/"] picture img {
-    height: 36px !important;
-    width: 112px !important;
+    height: 28px !important;
+    width: 88px !important;
   }
 
   header a[href="/"] svg {
