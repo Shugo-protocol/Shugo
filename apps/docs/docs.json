@@ -74,10 +74,13 @@
     "library": "tabler"
   },
   "background": {
-    "decoration": "gradient"
+    "color": {
+      "light": "#FFFFFF",
+      "dark": "#111113"
+    }
   },
   "appearance": {
-    "default": "light"
+    "default": "dark"
   },
   "styling": {
     "eyebrows": "breadcrumbs"

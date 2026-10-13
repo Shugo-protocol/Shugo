@@ -89,13 +89,16 @@ button[class*="border"]:hover,
 /* -----------------------------------------------------
    4. NAVBAR LOGO — LARGER BRAND MARK
    ----------------------------------------------------- */
-/* Homepage-linked logo */
+/* The logo PNGs are 500x500 squares with lots of empty padding around
+   the wordmark. Crop to the wordmark so it renders large and crisp. */
+img.nav-logo,
 header a[href="/"] img,
 header a[href="/"] picture img {
-  height: 40px !important;
-  width: auto !important;
-  max-width: 220px !important;
-  object-fit: contain;
+  height: 44px !important;
+  width: 140px !important;
+  max-width: none !important;
+  object-fit: cover !important;
+  object-position: center !important;
 }
 
 /* Show only one logo per theme (light logo in light mode, dark logo in dark mode) */
@@ -121,6 +124,60 @@ header[class*="sticky"] {
   background-color: transparent !important;
   box-shadow: none !important;
   border-bottom-color: transparent !important;
+}
+
+/* Subtle divider + blur so content scrolling underneath stays readable */
+#navbar {
+  border-bottom: 1px solid var(--shugo-border) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* -----------------------------------------------------
+   4c. MINIMAL "HARBOR" LOOK
+   ----------------------------------------------------- */
+/* Flat near-black canvas in dark mode, no glow */
+.dark body,
+.dark #background-color {
+  background-color: #111113 !important;
+  background-image: none !important;
+}
+
+/* Quiet sidebar: muted links, bold group headers */
+#sidebar-content a {
+  font-size: 0.9rem;
+  opacity: 0.85;
+}
+
+#sidebar-content a:hover,
+#sidebar-content li[data-active] a {
+  opacity: 1;
+}
+
+.sidebar-group-header,
+sidebar-group-header {
+  font-weight: 600 !important;
+  letter-spacing: 0.01em;
+}
+
+/* Outlined cards like Harbor's */
+card,
+.card {
+  border: 1px solid var(--shugo-border) !important;
+  border-radius: 12px !important;
+  background: transparent !important;
+  transition: border-color 150ms ease;
+}
+
+card:hover,
+.card:hover {
+  border-color: var(--shugo-mint) !important;
+}
+
+/* Larger, tighter page title */
+#page-title {
+  font-weight: 600;
+  letter-spacing: -0.02em;
 }
 
 /* Align the logo vertically */
@@ -179,10 +236,11 @@ blockquote {
    8. MOBILE
    ----------------------------------------------------- */
 @media (max-width: 768px) {
+  img.nav-logo,
   header a[href="/"] img,
   header a[href="/"] picture img {
-    height: 32px !important;
-    max-width: 175px !important;
+    height: 36px !important;
+    width: 112px !important;
   }
 
   header a[href="/"] svg {
