@@ -140,7 +140,37 @@ header[class*="sticky"] {
 .dark body,
 .dark #background-color {
   background-color: #111113 !important;
-  background-image: none !important;
+}
+
+/* -----------------------------------------------------
+   4d. DECORATIVE BACKGROUND SHAPES (Mintlify-style)
+   Faint outlined shield, cubes, rocket, wallet, terminal,
+   gauge and paper plane behind the page.
+   ----------------------------------------------------- */
+:root {
+  --shugo-bg-shapes: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1600 1000' fill='none'><g stroke='%23087F52' stroke-opacity='0.16' stroke-width='1.5' stroke-linejoin='round' fill='%231AF193' fill-opacity='0.05'><path d='M210 150 L320 110 L430 150 L430 270 C430 350 370 400 320 425 C270 400 210 350 210 270 Z'/><path d='M275 265 L310 300 L370 230' fill='none'/><path d='M800 -20 L900 30 L900 140 L800 190 L700 140 L700 30 Z'/><path d='M700 30 L800 80 L900 30 M800 80 L800 190' fill='none'/><path d='M640 150 L690 175 L690 235 L640 260 L590 235 L590 175 Z'/><path d='M960 150 L1010 175 L1010 235 L960 260 L910 235 L910 175 Z'/><path d='M1380 120 C1460 80 1540 90 1560 110 C1580 130 1570 210 1530 290 C1500 340 1430 360 1400 330 L1350 280 C1320 250 1340 170 1380 120 Z'/><circle cx='1470' cy='200' r='22' fill='none'/><path d='M1350 280 L1310 300 L1320 340 M1400 330 L1380 370 L1340 360' fill='none'/><rect x='120' y='640' width='200' height='130' rx='14'/><path d='M250 685 H320 V725 H250 A20 20 0 0 1 250 685 Z'/><rect x='1290' y='590' width='230' height='160' rx='10'/><path d='M1290 615 H1520 M1320 660 L1345 680 L1320 700 M1360 700 H1400' fill='none'/><path d='M1180 930 A90 90 0 0 1 1360 930 M1270 930 L1320 880' fill='none'/><path d='M420 880 L600 820 L520 960 L490 905 Z'/><path d='M490 905 L600 820' fill='none'/></g></svg>");
+  --shugo-bg-shapes-dark: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1600 1000' fill='none'><g stroke='%231AF193' stroke-opacity='0.22' stroke-width='1.5' stroke-linejoin='round' fill='%231AF193' fill-opacity='0.04'><path d='M210 150 L320 110 L430 150 L430 270 C430 350 370 400 320 425 C270 400 210 350 210 270 Z'/><path d='M275 265 L310 300 L370 230' fill='none'/><path d='M800 -20 L900 30 L900 140 L800 190 L700 140 L700 30 Z'/><path d='M700 30 L800 80 L900 30 M800 80 L800 190' fill='none'/><path d='M640 150 L690 175 L690 235 L640 260 L590 235 L590 175 Z'/><path d='M960 150 L1010 175 L1010 235 L960 260 L910 235 L910 175 Z'/><path d='M1380 120 C1460 80 1540 90 1560 110 C1580 130 1570 210 1530 290 C1500 340 1430 360 1400 330 L1350 280 C1320 250 1340 170 1380 120 Z'/><circle cx='1470' cy='200' r='22' fill='none'/><path d='M1350 280 L1310 300 L1320 340 M1400 330 L1380 370 L1340 360' fill='none'/><rect x='120' y='640' width='200' height='130' rx='14'/><path d='M250 685 H320 V725 H250 A20 20 0 0 1 250 685 Z'/><rect x='1290' y='590' width='230' height='160' rx='10'/><path d='M1290 615 H1520 M1320 660 L1345 680 L1320 700 M1360 700 H1400' fill='none'/><path d='M1180 930 A90 90 0 0 1 1360 930 M1270 930 L1320 880' fill='none'/><path d='M420 880 L600 820 L520 960 L490 905 Z'/><path d='M490 905 L600 820' fill='none'/></g></svg>");
+}
+
+body,
+#background-color {
+  background-image: var(--shugo-bg-shapes) !important;
+  background-size: cover !important;
+  background-position: center top !important;
+  background-repeat: no-repeat !important;
+  background-attachment: fixed !important;
+}
+
+.dark body,
+.dark #background-color {
+  background-image: var(--shugo-bg-shapes-dark) !important;
+}
+
+@media (max-width: 768px) {
+  body,
+  #background-color {
+    background-image: none !important;
+  }
 }
 
 /* Quiet sidebar: muted links, bold group headers */
@@ -172,28 +202,6 @@ card,
 card:hover,
 .card:hover {
   border-color: var(--shugo-mint) !important;
-}
-
-/* -----------------------------------------------------
-   4d. CENTERED LAYOUT (sidebar + TOC pulled toward the text)
-   ----------------------------------------------------- */
-@media (min-width: 1280px) {
-  :root {
-    --shugo-layout-width: 1240px;
-    --shugo-gutter: max(0px, calc((100vw - var(--shugo-layout-width)) / 2));
-  }
-
-  /* Keep the page, sidebar and table of contents in one centered column */
-  #body-content {
-    max-width: var(--shugo-layout-width);
-    margin-left: auto !important;
-    margin-right: auto !important;
-  }
-
-  /* Sidebar is fixed in some themes: offset it to the centered column */
-  #sidebar {
-    left: var(--shugo-gutter) !important;
-  }
 }
 
 /* Larger, tighter page title */

@@ -60,8 +60,15 @@
   "navbar": {
     "primary": {
       "type": "github",
-      "href": "https://github.com/Shugo-protocol"
-    }
+      "href": "https://github.com/shugo-protocol/shugo"
+    },
+    "links": [
+      {
+        "icon": "brand-github",
+        "href": "https://github.com/Shugo-protocol",
+        "label": "GitHub"
+      }
+    ]
   },
   "footer": {
     "socials": {
