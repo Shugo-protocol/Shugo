@@ -8,9 +8,9 @@
   },
   "favicon": "/favicon.svg",
   "colors": {
-    "primary": "#FFFFFF",
-    "light": "#000000",
-    "dark": "#FFFFFF"
+    "primary": "#FC4C02",
+    "light": "#FC4C02",
+    "dark": "#FC4C02"
   },
   "topbarLinks": [
     {
@@ -40,7 +40,7 @@
             ]
           },
           {
-            "group": "reference",
+            "group": "Reference",
             "pages": [
               "sdk-reference",
               "cli-reference"
@@ -77,7 +77,8 @@
     "decoration": "gradient"
   },
   "appearance": {
-    "default": "light"
+    "default": "light",
+    "strict": false
   },
   "styling": {
     "eyebrows": "breadcrumbs"

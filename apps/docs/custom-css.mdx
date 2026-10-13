@@ -1,0 +1,291 @@
+---
+title: "custom.css"
+---
+
+/\* =========================================================
+
+   SHUGO DOCS — GLOBAL STYLES
+
+   Brand: #FC4C02
+
+   Focus: hover contrast, navigation, logo, code blocks
+
+   ========================================================= \*/
+
+:root \{
+
+  --shugo-accent: #FC4C02;
+
+  --shugo-accent-hover: #D93E00;
+
+  --shugo-code-border: rgba(128, 128, 128, 0.28);
+
+  --shugo-code-background: rgba(128, 128, 128, 0.09);
+
+\}
+
+/\* -------------------------
+
+   1. LINKS AND HOVER STATES
+
+   ------------------------- \*/
+
+a \{
+
+  transition:
+
+    color 140ms ease,
+
+    opacity 140ms ease;
+
+\}
+
+a:hover \{
+
+  color: var(--shugo-accent) !important;
+
+\}
+
+/\* Keyboard accessibility \*/
+
+a:focus-visible,
+
+button:focus-visible,
+
+\[role="button"\]:focus-visible \{
+
+  outline: 2px solid var(--shugo-accent) !important;
+
+  outline-offset: 3px;
+
+\}
+
+/\* -------------------------
+
+   2. SIDEBAR NAVIGATION
+
+   ------------------------- \*/
+
+aside a:hover,
+
+nav a:hover \{
+
+  color: var(--shugo-accent) !important;
+
+\}
+
+/\* Current page in the sidebar \*/
+
+aside a[aria-current="page"],
+
+nav a[aria-current="page"] \{
+
+  color: var(--shugo-accent) !important;
+
+  font-weight: 600;
+
+\}
+
+/\* Keep hover and active backgrounds subtle \*/
+
+aside a:hover,
+
+nav a:hover \{
+
+  border-radius: 6px;
+
+\}
+
+/\* -------------------------
+
+   3. BUTTONS
+
+   ------------------------- \*/
+
+/\* Preserve readable text on filled buttons \*/
+
+button:hover,
+
+\[role="button"\]:hover \{
+
+  cursor: pointer;
+
+\}
+
+/\* Filled buttons should keep a high-contrast label \*/
+
+button[class\*="bg-primary"]:hover,
+
+\[role="button"\][class\*="bg-primary"\]:hover \{
+
+  color: #FFFFFF !important;
+
+\}
+
+/\* Outlined and neutral buttons \*/
+
+button[class\*="border"]:hover,
+
+\[role="button"\][class\*="border"\]:hover \{
+
+  border-color: var(--shugo-accent);
+
+\}
+
+/\* -------------------------
+
+   4. NAVBAR LOGO
+
+   ------------------------- \*/
+
+/\*
+
+   Targets the brand image linked to the homepage.
+
+   If your logo is rendered differently by Mintlify,
+
+   inspect the logo element and adjust this selector.
+
+\*/
+
+header a[href="/"] img \{
+
+  height: 30px !important;
+
+  width: auto !important;
+
+  max-width: 180px;
+
+  object-fit: contain;
+
+\}
+
+/\* Keep the logo from stretching the navbar \*/
+
+header a[href="/"] \{
+
+  display: inline-flex;
+
+  align-items: center;
+
+\}
+
+/\* -------------------------
+
+   5. INLINE CODE
+
+   ------------------------- \*/
+
+:not(pre) > code \{
+
+  padding: 0.15em 0.4em;
+
+  border: 1px solid var(--shugo-code-border);
+
+  border-radius: 5px;
+
+  background: var(--shugo-code-background);
+
+  font-size: 0.88em;
+
+  font-weight: 500;
+
+  overflow-wrap: anywhere;
+
+\}
+
+/\* -------------------------
+
+   6. CODE BLOCKS
+
+   ------------------------- \*/
+
+pre \{
+
+  border: 1px solid var(--shugo-code-border);
+
+  border-radius: 12px;
+
+  overflow-x: auto;
+
+\}
+
+/\* Keep code readable and prevent long lines
+
+   from breaking the page layout. \*/
+
+pre code \{
+
+  font-variant-ligatures: none;
+
+  tab-size: 2;
+
+\}
+
+/\* -------------------------
+
+   7. TABLES AND CALLOUTS
+
+   ------------------------- \*/
+
+table \{
+
+  border-collapse: separate;
+
+  border-spacing: 0;
+
+\}
+
+th,
+
+td \{
+
+  border-color: var(--shugo-code-border);
+
+\}
+
+blockquote \{
+
+  border-left-color: var(--shugo-accent);
+
+\}
+
+/\* -------------------------
+
+   8. RESPONSIVE ADJUSTMENTS
+
+   ------------------------- \*/
+
+@media (max-width: 768px) \{
+
+  header a[href="/"] img \{
+
+    height: 26px !important;
+
+    max-width: 150px;
+
+  \}
+
+  pre \{
+
+    max-width: 100%;
+
+  \}
+
+\}
+
+/\* -------------------------
+
+   9. REDUCED MOTION
+
+   ------------------------- \*/
+
+@media (prefers-reduced-motion: reduce) \{
+
+  a \{
+
+    transition: none;
+
+  \}
+
+\}
