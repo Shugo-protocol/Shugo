@@ -1,6 +1,7 @@
 ---
 title: "SDK Reference"
 description: "Build Shugo policy creation and guarded pulls directly into an agent framework with @shugo-protocol/sdk"
+icon: "code"
 ---
 
 `@shugo-protocol/sdk` builds the transactions for everything the [CLI](/cli-reference) does, as plain functions you call from your own code. It never signs and never sends: every function returns an unsigned `Transaction` (or a single instruction) and leaves signing, fee payment, and submission to you. That's deliberate — your agent framework already has opinions about key management and RPC handling, and the SDK shouldn't override them.

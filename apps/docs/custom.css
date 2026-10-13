@@ -96,7 +96,31 @@ header a[href="/"] picture img {
   width: auto !important;
   max-width: 220px !important;
   object-fit: contain;
-  display: block;
+}
+
+/* Show only one logo per theme (light logo in light mode, dark logo in dark mode) */
+.dark header a[href="/"] img.dark\:hidden,
+.dark .nav-logo.dark\:hidden {
+  display: none !important;
+}
+
+html:not(.dark) header a[href="/"] img.dark\:block,
+html:not(.dark) .nav-logo.dark\:block {
+  display: none !important;
+}
+
+/* -----------------------------------------------------
+   4b. TRANSPARENT NAVBAR
+   ----------------------------------------------------- */
+#navbar,
+#navbar > div,
+#navbar-transition,
+header#navbar,
+header[class*="sticky"] {
+  background: transparent !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+  border-bottom-color: transparent !important;
 }
 
 /* Align the logo vertically */
@@ -181,4 +205,13 @@ blockquote {
     animation-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* -----------------------------------------------------
+   10. HIDE BOTTOM "ASK A QUESTION" BAR
+   Keeps the topbar "Ask assistant" button (#assistant-entry)
+   ----------------------------------------------------- */
+chat-assistant-floating-input,
+.chat-assistant-floating-input {
+  display: none !important;
 }
