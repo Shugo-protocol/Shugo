@@ -1,41 +1,87 @@
+---
+title: "mint.json"
+---
+
+```json
 {
-  "$schema": "https://mintlify.com/schema.json",
-  "name": "Shugo / 守護",
+  "theme": "sequoia",
+  "name": "shugo",
+  "colors": {
+    "primary": "#FFFFFF",
+    "light": "#000000",
+    "dark": "#FFFFFF"
+  },
   "logo": {
-    "dark": "/logo-dark.svg",
-    "light": "/logo-light.svg"
+    "light": "/apps/docs/images/Shugo(2)(1).png",
+    "dark": "/apps/docs/images/Shugo(1)(1).png"
   },
   "favicon": "/favicon.svg",
-  "topbarCtaButton": {
-    "name": "App & Playground",
-    "url": "https://shugo.network"
+  "appearance": {
+    "default": "light"
   },
-  "topbarLinks": [
-    {
-      "name": "GitHub",
-      "url": "https://github.com/shugo-protocol/shugo"
-    }
-  ],
-  "navigation": [
-    {
-      "group": "Getting Started",
-      "pages": [
-        "introduction",
-        "quickstart"
-      ]
+  "background": {
+    "image": {
+      "light": "/apps/docs/images/Screenshot_20261013_054133.png",
+      "dark": "/apps/docs/images/Screenshot_20261013_054208.png"
     },
-    {
-      "group": "Architecture",
-      "pages": [
-        "zero-custody",
-        "velocity-caps"
-      ]
-    },
-    {
-      "group": "Developer Resources",
-      "pages": [
-        "copy-for-ai"
-      ]
+    "decoration": "grid"
+  },
+  "navbar": {
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/Shugo-protocol"
     }
-  ]
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/Shugo-protocol",
+      "website": "https://www.shugo.website",
+      "x": "https://x.com/ShugoProtocol"
+    }
+  },
+  "icons": {
+    "library": "lucide"
+  },
+  "$schema": "https://mintlify.com/docs.json",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Docs",
+        "pages": [
+          {
+            "group": "Getting Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "architecture"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "velocity-caps",
+              "velocity-caps-and-limits",
+              "security"
+            ]
+          },
+          {
+            "group": "reference",
+            "pages": [
+              "sdk-reference",
+              "cli-reference"
+            ]
+          },
+          "faq"
+        ]
+      },
+      {
+        "tab": "Changelog",
+        "pages": [
+          "changelog"
+        ]
+      }
+    ]
+  }
 }
+\
+```
